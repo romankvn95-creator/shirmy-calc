@@ -582,45 +582,71 @@ function CalculatorApp({ userName = '' }: { userName?: string }) {
 
 // ─── Токен-авторизация ───────────────────────────────────────────────────────
 const SCRIPT_URL = (import.meta as Record<string, any>).env?.VITE_SCRIPT_URL as string | undefined
+const LS_KEY = 'shirmy_access_token'
 
 type AuthState = 'loading' | 'ok' | 'denied'
 
 function TokenGate() {
   const [auth, setAuth]     = useState<AuthState>('loading')
   const [userName, setName] = useState('')
-
-  const tokenRef = useCallback(() => {
-    const p = new URLSearchParams(window.location.search)
-    return (p.get('token') || p.get('t') || '').trim()
-  }, [])
+  const [activeToken, setActiveToken] = useState('')
 
   useEffect(() => {
-    const token = tokenRef()
+    // 1. Берём токен из URL или из localStorage
+    const params = new URLSearchParams(window.location.search)
+    const urlToken = (params.get('token') || params.get('t') || '').trim()
+    const lsToken  = localStorage.getItem(LS_KEY) || ''
+    const token    = urlToken || lsToken
+
     if (!token) { setAuth('denied'); return }
-    if (!SCRIPT_URL) { setAuth('ok'); return }   // dev-режим без URL
+    if (!SCRIPT_URL) {
+      // dev-режим: просто открываем без проверки
+      setAuth('ok')
+      return
+    }
 
     fetch(`${SCRIPT_URL}?token=${encodeURIComponent(token)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok) { setName(data.name ?? ''); setAuth('ok') }
-        else setAuth('denied')
+        if (data.ok) {
+          // Сохраняем токен в localStorage → следующий визит без ?token= сработает
+          localStorage.setItem(LS_KEY, token)
+          setActiveToken(token)
+          setName(data.name ?? '')
+          setAuth('ok')
+          // Убираем токен из адресной строки (чище смотрится)
+          if (urlToken && window.history.replaceState) {
+            window.history.replaceState({}, '', window.location.pathname)
+          }
+        } else {
+          // Токен недействителен — чистим localStorage
+          localStorage.removeItem(LS_KEY)
+          setAuth('denied')
+        }
       })
-      .catch(() => setAuth('denied'))
-  }, [tokenRef])
+      .catch(() => {
+        // При ошибке сети — если токен был из localStorage, всё равно показываем
+        if (lsToken && !urlToken) {
+          setActiveToken(lsToken)
+          setAuth('ok')
+        } else {
+          setAuth('denied')
+        }
+      })
+  }, [])
 
   // Heartbeat каждые 2 мин
   useEffect(() => {
-    if (auth !== 'ok' || !SCRIPT_URL) return
-    const token = tokenRef()
+    if (auth !== 'ok' || !SCRIPT_URL || !activeToken) return
     const ping = () => fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token: activeToken }),
     }).catch(() => {})
     ping()
     const id = setInterval(ping, 2 * 60 * 1000)
     return () => clearInterval(id)
-  }, [auth, tokenRef])
+  }, [auth, activeToken])
 
   if (auth === 'loading') return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
