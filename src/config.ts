@@ -8,8 +8,15 @@ export const CALC_CONFIG = {
   heightSurchargeStep: 200,   // per 200mm (20cm)
   nonStandardPenalty: 0.05,  // 5%
   colors: ['Белый', 'Чёрный', 'Бежевый', 'Серый'],
+  frameMaterials: [
+    { id: 'pine', name: 'Дерево', color: '#8b5e3c', multiplier: 1.0 },
+    { id: 'mdf', name: 'МДФ', color: '#57534e', multiplier: 1.15 },
+    { id: 'aluminum', name: 'Алюминий', color: '#94a3b8', multiplier: 1.40 }
+  ],
   productionDays: 5,
-  prepaymentRate: 0.5,
+  prepaymentRate: 0.7,
+  markup: 2.5,
+  commissionRate: 0.2,
 };
 
 export const demoGallery = [

@@ -7,7 +7,7 @@ export default function App() {
   const [showKP, setShowKP] = useState(false);
   const [mode, setMode] = useState<'client' | 'manager'>('client');
   const [params, setParams] = useState({
-    width: 2000, height: 1800, color: 'Белый'
+    width: 2000, height: 1800, color: 'Белый', frame: 'Дерево', customer: ''
   });
 
   const handleNumChange = (key: string, val: string) => {
@@ -19,6 +19,10 @@ export default function App() {
     // 1. Calculate sections
     const sections = Math.ceil(params.width / CALC_CONFIG.sectionWidth) || 1;
     
+    // Find frame material multiplier and color
+    const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
+    const frameStrokeColor = frameData?.color || '#8b5e3c';
+
     // 2. Base price per section based on height
     let pricePerSection = 2500; // default for 1800
     if (params.height <= 1500) {
@@ -35,19 +39,32 @@ export default function App() {
     // 3. Total base
     let total = pricePerSection * sections;
 
+    // Apply frame material multiplier
+    if (frameData) {
+      total *= frameData.multiplier;
+      pricePerSection *= frameData.multiplier;
+    }
+
     // 4. Non-standard width penalty (+5%)
     const isNonStandard = params.width % CALC_CONFIG.sectionWidth !== 0;
     if (isNonStandard) {
       total *= (1 + CALC_CONFIG.nonStandardPenalty);
     }
 
-    const prepayment = total * CALC_CONFIG.prepaymentRate;
+    const prepayment = Math.ceil(total * CALC_CONFIG.prepaymentRate * 100) / 100;
+    const cost = total / CALC_CONFIG.markup;
+    const margin = total - cost;
+    const managerEarnings = margin * CALC_CONFIG.commissionRate;
 
     return { 
       sections, 
       pricePerSection, 
+      finalPricePerSection: total / sections,
       total, 
       prepayment, 
+      cost,
+      margin,
+      managerEarnings,
       isNonStandard,
       term: CALC_CONFIG.productionDays 
     };
@@ -62,6 +79,10 @@ export default function App() {
     const sectionsCount = calcResults.sections;
     const sectionW = totalW / sectionsCount;
     const hasWheels = params.height >= 2000;
+    
+    // Find frame color for drawing
+    const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
+    const frameStrokeColor = frameData?.color || '#8b5e3c';
     
     const colorMap: Record<string, string> = {
       'Белый': '#ffffff',
@@ -94,7 +115,7 @@ export default function App() {
                 width={sectionW} 
                 height={totalH} 
                 fill={fillColor} 
-                stroke="#8b5e3c" 
+                stroke={frameStrokeColor} 
                 strokeWidth="2"
               />
               {/* Wheels for high screen */}
@@ -141,15 +162,15 @@ export default function App() {
                 {/* Section line with thickness */}
                 <line 
                   x1={x1} y1={y1} x2={x2} y2={y2} 
-                  stroke="#8b5e3c" strokeWidth="5" strokeLinecap="round" 
+                  stroke={frameStrokeColor} strokeWidth="5" strokeLinecap="round" 
                 />
                 <line 
                   x1={x1} y1={y1} x2={x2} y2={y2} 
                   stroke={fillColor} strokeWidth="3" strokeLinecap="round" 
                 />
                 {/* Hinge point */}
-                <circle cx={x1} cy={y1} r="2.5" fill="#8b5e3c" />
-                {i === sectionsCount - 1 && <circle cx={x2} cy={y2} r="2.5" fill="#8b5e3c" />}
+                <circle cx={x1} cy={y1} r="2.5" fill={frameStrokeColor} />
+                {i === sectionsCount - 1 && <circle cx={x2} cy={y2} r="2.5" fill={frameStrokeColor} />}
                 
                 {/* Section width label for the first section */}
                 {i === 0 && (
@@ -192,11 +213,22 @@ export default function App() {
               size={14} 
               className="text-slate-400 cursor-pointer hover:rotate-180 transition-transform duration-500" 
               onClick={() => setParams({
-                width: 2000, height: 1800, color: 'Белый'
+                width: 2000, height: 1800, color: 'Белый', frame: 'Дерево', customer: ''
               })}
             />
           </div>
           <div className="p-5 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Имя заказчика</label>
+                <input 
+                  type="text" 
+                  value={params.customer} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
+                  placeholder="Введите имя..." 
+                  onChange={(e) => setParams(prev => ({ ...prev, customer: e.target.value }))}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ширина проёма (мм)</label>
@@ -219,6 +251,25 @@ export default function App() {
                     placeholder="1800" 
                     onChange={(e) => handleNumChange('height', e.target.value)}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Материал каркаса</label>
+                <div className="flex flex-wrap gap-2">
+                  {CALC_CONFIG.frameMaterials.map(frame => (
+                     <button
+                       key={frame.id}
+                       onClick={() => setParams(prev => ({ ...prev, frame: frame.name }))}
+                       className={`px-3 py-2 text-[10px] font-bold rounded-xl border transition-all ${
+                        params.frame === frame.name 
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-indigo-300'
+                       }`}
+                     >
+                       {frame.name}
+                     </button>
+                  ))}
                 </div>
               </div>
 
@@ -294,8 +345,8 @@ export default function App() {
             
             <div className="mt-6 flex flex-col gap-2 pt-6 border-t border-white/10">
               <div className="flex justify-between items-center">
-                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Предоплата 50%:</span>
-                 <span className="text-lg font-black text-indigo-400">{Math.round(calcResults.prepayment).toLocaleString()} ₽</span>
+                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Предоплата {CALC_CONFIG.prepaymentRate * 100}%:</span>
+                 <span className="text-lg font-black text-indigo-400">{calcResults.prepayment.toLocaleString()} ₽</span>
               </div>
             </div>
             
@@ -304,6 +355,18 @@ export default function App() {
                 <div className="flex justify-between text-[10px] text-slate-400 uppercase font-black">
                   <span>Цена за секцию:</span>
                   <span className="text-white">{Math.round(calcResults.pricePerSection).toLocaleString()} ₽</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 uppercase font-black pt-2">
+                  <span>Себестоимость:</span>
+                  <span className="text-slate-300">{Math.round(calcResults.cost).toLocaleString()} ₽</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-emerald-400 uppercase font-black">
+                  <span>Маржа:</span>
+                  <span>{Math.round(calcResults.margin).toLocaleString()} ₽</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-orange-400 uppercase font-black mt-2 bg-white/5 p-2 rounded-lg border border-orange-500/20">
+                  <span>Заработок (20%):</span>
+                  <span>{Math.round(calcResults.managerEarnings).toLocaleString()} ₽</span>
                 </div>
               </div>
             )}
@@ -332,6 +395,10 @@ export default function App() {
            <h3 className="font-bold text-slate-400 uppercase mb-4 text-[10px] tracking-wider">Детализация заказа</h3>
            <div className="space-y-2.5">
              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">Материал каркаса</span>
+                <span className="font-bold text-slate-700">{params.frame}</span>
+             </div>
+             <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Цена за секцию</span>
                 <span className="font-bold text-slate-700">{Math.round(calcResults.pricePerSection).toLocaleString()} ₽</span>
              </div>
@@ -340,8 +407,8 @@ export default function App() {
                 <span className="font-bold text-slate-700">{calcResults.sections} шт</span>
              </div>
              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500">Предоплата 50%</span>
-                <span className="font-bold text-indigo-600">{Math.round(calcResults.prepayment).toLocaleString()} ₽</span>
+                <span className="text-slate-500">Предоплата {CALC_CONFIG.prepaymentRate * 100}%</span>
+                <span className="font-bold text-indigo-600">{calcResults.prepayment.toLocaleString()} ₽</span>
              </div>
              <div className="w-full h-px bg-slate-50 my-1"></div>
              <div className="flex justify-between items-center text-xs font-bold text-slate-900 pt-1">
@@ -449,7 +516,7 @@ export default function App() {
                 </div>
                 <div className="sm:text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Заказчик</p>
-                  <p className="font-semibold text-sm sm:text-base text-slate-700 leading-tight">Индивидуальный предприниматель / Частный клиент</p>
+                  <p className="font-semibold text-sm sm:text-base text-slate-700 leading-tight">{params.customer || 'Частный клиент'}</p>
                 </div>
               </div>
 
@@ -460,8 +527,8 @@ export default function App() {
                   <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Высота секции:</span> <span className="font-bold">{params.height} мм</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Кол-во секций:</span> <span className="font-bold">{calcResults.sections} шт.</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Цвет ткани:</span> <span className="font-bold">{params.color}</span></div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Каркас:</span> <span className="font-bold">Натуральное дерево</span></div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Наполнение:</span> <span className="font-bold">Интерьерная ткань</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Каркас:</span> <span className="font-bold">{params.frame}</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1.5"><span className="text-slate-400">Наполнение:</span> <span className="font-bold">Нейлон</span></div>
                 </div>
               </div>
 
@@ -477,7 +544,7 @@ export default function App() {
                   <div>
                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Условия поставки</p>
                     <p className="font-bold text-slate-900 text-sm">Срок изготовления: {calcResults.term} рабочих дней</p>
-                    <p className="text-slate-500 text-xs mt-1">Предоплата: {CALC_CONFIG.prepaymentRate * 100}%</p>
+                    <p className="text-slate-500 text-xs mt-1">Предоплата: {CALC_CONFIG.prepaymentRate * 100}% (<span className="font-bold text-indigo-600">{calcResults.prepayment.toLocaleString()} ₽</span>)</p>
                   </div>
                   <div className="sm:text-right">
                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">Всего к оплате (вкл. НДС 0%)</p>
@@ -485,7 +552,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="bg-amber-50 border-l-2 border-amber-400 p-3">
-                  <p className="text-[10px] text-amber-700 leading-relaxed font-medium">Предварительный расчет носит информационный характер и действителен в течение 5 рабочих дней. Окончательная стоимость формируется после выезда специалиста.</p>
+                  <p className="text-[10px] text-amber-700 leading-relaxed font-medium">Предварительный расчет носит информационный характер и действителен в течение 5 рабочих дней.</p>
                 </div>
               </div>
             </div>
