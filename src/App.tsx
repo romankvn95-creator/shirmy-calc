@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Download, FileText, User, Briefcase, LayoutGrid, ChevronDown, RefreshCw, Plus, Minus } from 'lucide-react';
 import { CALC_CONFIG, demoGallery } from './config';
 
-export default function App() {
+function CalculatorApp({ userName = '' }: { userName?: string }) {
   const [selectedImage, setSelectedImage] = useState<typeof demoGallery[0] | null>(null);
   const [showKP, setShowKP] = useState(false);
   const [mode, setMode] = useState<'client' | 'manager'>('client');
@@ -578,3 +578,71 @@ export default function App() {
     </div>
   );
 }
+
+
+// ─── Токен-авторизация ───────────────────────────────────────────────────────
+const SCRIPT_URL = (import.meta as Record<string, any>).env?.VITE_SCRIPT_URL as string | undefined
+
+type AuthState = 'loading' | 'ok' | 'denied'
+
+function TokenGate() {
+  const [auth, setAuth]     = useState<AuthState>('loading')
+  const [userName, setName] = useState('')
+
+  const tokenRef = useCallback(() => {
+    const p = new URLSearchParams(window.location.search)
+    return (p.get('token') || p.get('t') || '').trim()
+  }, [])
+
+  useEffect(() => {
+    const token = tokenRef()
+    if (!token) { setAuth('denied'); return }
+    if (!SCRIPT_URL) { setAuth('ok'); return }   // dev-режим без URL
+
+    fetch(`${SCRIPT_URL}?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) { setName(data.name ?? ''); setAuth('ok') }
+        else setAuth('denied')
+      })
+      .catch(() => setAuth('denied'))
+  }, [tokenRef])
+
+  // Heartbeat каждые 2 мин
+  useEffect(() => {
+    if (auth !== 'ok' || !SCRIPT_URL) return
+    const token = tokenRef()
+    const ping = () => fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).catch(() => {})
+    ping()
+    const id = setInterval(ping, 2 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [auth, tokenRef])
+
+  if (auth === 'loading') return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+      background:'linear-gradient(135deg,#1a1a2e,#0f3460)', color:'#fff', fontSize:18, fontFamily:'sans-serif' }}>
+      <span>Проверка доступа…</span>
+    </div>
+  )
+
+  if (auth === 'denied') return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center',
+      justifyContent:'center', background:'linear-gradient(135deg,#1a1a2e,#0f3460)',
+      color:'#fff', fontFamily:'sans-serif', textAlign:'center', padding:'2rem' }}>
+      <div style={{ fontSize:64, marginBottom:16 }}>🔒</div>
+      <h1 style={{ fontSize:28, fontWeight:800, marginBottom:8 }}>Доступ закрыт</h1>
+      <p style={{ fontSize:16, color:'rgba(255,255,255,0.65)', maxWidth:340 }}>
+        Ваша ссылка недействительна или доступ был отозван.<br />
+        Обратитесь к администратору.
+      </p>
+    </div>
+  )
+
+  return <CalculatorApp userName={userName} />
+}
+
+export default TokenGate
