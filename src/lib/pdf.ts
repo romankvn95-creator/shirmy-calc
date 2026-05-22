@@ -75,7 +75,7 @@ export function generateKpHtml(p: KpParams): string {
     '  </div>',
     '  <div class="sec">Конфигурация</div>',
     '  <table>',
-    '    <tr><td>Ширина проёма</td><td>' + p.openingCm + ' см</td></tr>',
+    '    <tr><td>Ширина про&#x451;ма</td><td>' + p.openingCm + ' см</td></tr>',
     '    <tr><td>Высота секции</td><td>' + p.actualH + ' см' + wheelNote + '</td></tr>',
     '    <tr><td>Ширина секции</td><td>' + p.sectionW + ' см' + nonstdNote + '</td></tr>',
     '    <tr><td>Количество секций</td><td>' + p.sectionCount + ' шт.</td></tr>',
