@@ -1,15 +1,110 @@
 import { useState, useMemo } from 'react';
-import { Download, FileText, User, Briefcase, LayoutGrid, ChevronDown, RefreshCw, Plus, Minus } from 'lucide-react';
+import { Download, Copy, Check, LayoutGrid, RefreshCw, FileText } from 'lucide-react';
 import { CALC_CONFIG, demoGallery } from './config';
 
 export default function App() {
   const [selectedImage, setSelectedImage] = useState<typeof demoGallery[0] | null>(null);
   const [showKP, setShowKP] = useState(false);
-  const [showShare, setShowShare] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const [mode, setMode] = useState<'client' | 'manager'>('client');
   const [params, setParams] = useState({
     width: 2000, height: 1800, color: 'Белый', frame: 'Дерево', customer: ''
   });
+
+  // ── PDF: открыть чистый HTML-документ в новом окне и напечатать ──────
+  const handleSavePDF = () => {
+    const kpNum = Math.floor(Math.random() * 90000) + 10000;
+    const dateStr = new Date().toLocaleDateString('ru-RU');
+    const html = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8">
+<title>КП №${kpNum} от ${dateStr}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+@page{margin:15mm 20mm}
+body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-height:1.5}
+.hdr{background:#0f172a;color:#fff;padding:16pt 20pt;margin-bottom:20pt}
+.hdr h1{font-size:18pt;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+.hdr p{color:#94a3b8;font-size:9pt;margin-top:3pt}
+.row{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e2e8f0;padding-bottom:12pt;margin-bottom:16pt;gap:20pt}
+.lbl{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:3pt}
+.val{font-size:13pt;font-weight:700}
+.section-title{font-size:9pt;font-weight:900;color:#4f46e5;text-transform:uppercase;letter-spacing:2px;border-left:3px solid #4f46e5;padding-left:8pt;margin:16pt 0 10pt}
+.specs{display:grid;grid-template-columns:1fr 1fr;gap:6pt 30pt;margin-bottom:16pt}
+.spec{display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding:5pt 0}
+.spec span:first-child{color:#64748b}
+.spec span:last-child{font-weight:700}
+.total-block{display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid #0f172a;padding-top:16pt;margin-top:8pt;gap:20pt}
+.terms .t1{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:5pt}
+.terms .t2{font-size:13pt;font-weight:700}
+.terms .t3{color:#64748b;font-size:10pt;margin-top:3pt}
+.terms .t3 b{color:#4f46e5}
+.price-block{text-align:right}
+.price-block .pl{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:4pt}
+.price-block .pv{font-size:30pt;font-weight:900;letter-spacing:-1px;line-height:1}
+.disclaimer{margin-top:14pt;background:#fffbeb;border-left:3px solid #f59e0b;padding:8pt 10pt;font-size:9pt;color:#92400e;line-height:1.5}
+@media print{body{padding:0}}
+</style></head><body>
+<div class="hdr"><h1>Коммерческое предложение</h1><p>№ ${kpNum} &nbsp;&bull;&nbsp; ${dateStr}</p></div>
+<div class="row">
+  <div><div class="lbl">Поставщик</div><div class="val">Ширмы и Перегородки</div></div>
+  <div style="text-align:right"><div class="lbl">Заказчик</div><div class="val">${params.customer || 'Частный клиент'}</div></div>
+</div>
+<div class="section-title">Технические характеристики</div>
+<div class="specs">
+  <div class="spec"><span>Ширина проёма</span><span>${params.width} мм</span></div>
+  <div class="spec"><span>Высота секции</span><span>${params.height} мм</span></div>
+  <div class="spec"><span>Кол-во секций</span><span>${calcResults.sections} шт.</span></div>
+  <div class="spec"><span>Цвет ткани</span><span>${params.color}</span></div>
+  <div class="spec"><span>Материал каркаса</span><span>${params.frame}</span></div>
+  <div class="spec"><span>Наполнение</span><span>Нейлон</span></div>
+</div>
+<div class="total-block">
+  <div class="terms">
+    <div class="t1">Условия поставки</div>
+    <div class="t2">Срок изготовления: ${calcResults.term} рабочих дней</div>
+    <div class="t3">Предоплата ${CALC_CONFIG.prepaymentRate * 100}%: <b>${calcResults.prepayment.toLocaleString()} ₽</b></div>
+  </div>
+  <div class="price-block">
+    <div class="pl">Итого к оплате</div>
+    <div class="pv">${Math.round(calcResults.total).toLocaleString()} ₽</div>
+  </div>
+</div>
+<div class="disclaimer">Предварительный расчёт действителен 5 рабочих дней. Для оформления заказа свяжитесь с нами.</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  };
+
+  // ── Копировать текст КП ─────────────────────────────────────────────────
+  const handleCopyText = () => {
+    const lines = [
+      '📋 КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ',
+      '',
+      params.customer ? `👤 Заказчик: ${params.customer}` : '👤 Заказчик: Частный клиент',
+      `📅 Дата: ${new Date().toLocaleDateString('ru-RU')}`,
+      '',
+      '📐 ПАРАМЕТРЫ ШИРМЫ:',
+      `• Ширина проёма: ${params.width} мм`,
+      `• Высота секции: ${params.height} мм`,
+      `• Количество секций: ${calcResults.sections} шт.`,
+      `• Материал каркаса: ${params.frame}`,
+      `• Цвет ткани: ${params.color}`,
+      `• Наполнение: Нейлон`,
+      '',
+      '💰 СТОИМОСТЬ:',
+      `• Итого: ${Math.round(calcResults.total).toLocaleString()} ₽`,
+      `• Предоплата 70%: ${calcResults.prepayment.toLocaleString()} ₽`,
+      `• Срок изготовления: ${calcResults.term} рабочих дней`,
+      '',
+      '⚡ Расчёт действителен 5 рабочих дней.',
+    ];
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2500);
+    });
+  };
 
   const handleNumChange = (key: string, val: string) => {
     const cleaned = val.replace(/[^0-9]/g, '');
@@ -577,98 +672,37 @@ export default function App() {
             </div>
 
             {/* KP Footer */}
-            <div id="kp-footer" className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3">
-              <button 
-                onClick={() => { window.print(); setTimeout(() => setShowShare(true), 800); }}
-                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+            <div id="kp-footer" className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleSavePDF}
+                  className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                >
+                  <Download size={18} /> Сохранить PDF
+                </button>
+                <button 
+                  onClick={() => setShowKP(false)}
+                  className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors"
+                >
+                  Вернуться
+                </button>
+              </div>
+              <button
+                onClick={handleCopyText}
+                className={`w-full py-3 rounded-xl sm:rounded-2xl font-bold text-sm flex items-center justify-center gap-2 border transition-all active:scale-95 ${
+                  isCopied
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-700'
+                }`}
               >
-                <Download size={18} /> Отправить PDF
-              </button>
-              <button 
-                onClick={() => setShowKP(false)}
-                className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors"
-              >
-                Вернуться
+                {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                {isCopied ? '✓ Скопировано!' : 'Копировать текст (для Авито / мессенджеров)'}
               </button>
             </div>
           </div>
         </div>
       )}
-          {/* Share PDF Dialog */}
-      {showShare && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <FileText size={20} className="text-indigo-600" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Отправить КП</h3>
-                <p className="text-[11px] text-slate-400">PDF сохранён — выберите куда отправить</p>
-              </div>
-            </div>
-            <div className="bg-indigo-50 rounded-xl p-3 mb-4 border border-indigo-100">
-              <p className="text-[11px] text-indigo-700 font-medium leading-relaxed">
-                {params.customer ? `${params.customer} — ` : ''}ширма {params.width}×{params.height} мм, {calcResults.sections} секц. · {Math.round(calcResults.total).toLocaleString()} ₽
-              </p>
-            </div>
-            <div className="space-y-2.5">
-              <button
-                onClick={() => {
-                  const text = `КП на ширму/перегородку
-${params.customer ? `Заказчик: ${params.customer}
-` : ''}Размер: ${params.width}×${params.height} мм
-Кол-во секций: ${calcResults.sections} шт.
-Материал: ${params.frame}, ткань ${params.color}
-Стоимость: ${Math.round(calcResults.total).toLocaleString()} ₽
-Предоплата: ${calcResults.prepayment.toLocaleString()} ₽ (${CALC_CONFIG.prepaymentRate * 100}%)
-Срок: ${calcResults.term} рабочих дней`;
-                  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-                  setShowShare(false);
-                }}
-                className="w-full py-3 bg-green-500 hover:bg-green-400 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.124.553 4.133 1.52 5.875L0 24l6.335-1.502A11.958 11.958 0 0012 24c6.626 0 12-5.373 12-12S18.626 0 12 0zm0 22c-1.842 0-3.565-.485-5.055-1.333l-.36-.214-3.76.892.932-3.668-.236-.374A9.943 9.943 0 012 12c0-5.514 4.486-10 10-10s10 4.486 10 10-4.486 10-10 10z"/></svg>
-                WhatsApp
-              </button>
-              <button
-                onClick={() => {
-                  const text = `КП на ширму/перегородку
-${params.customer ? `Заказчик: ${params.customer}
-` : ''}Размер: ${params.width}×${params.height} мм · ${calcResults.sections} секций
-Материал: ${params.frame}, ткань ${params.color}
-Стоимость: ${Math.round(calcResults.total).toLocaleString()} ₽
-Предоплата: ${calcResults.prepayment.toLocaleString()} ₽`;
-                  window.open('https://t.me/share/url?url=&text=' + encodeURIComponent(text), '_blank');
-                  setShowShare(false);
-                }}
-                className="w-full py-3 bg-sky-500 hover:bg-sky-400 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-                Telegram
-              </button>
-              <button
-                onClick={() => {
-                  const subject = `КП на ширму ${params.width}×${params.height} мм`;
-                  const body = `Здравствуйте!%0A%0AНаправляю коммерческое предложение:%0A%0AРазмер: ${params.width}×${params.height} мм%0AКол-во секций: ${calcResults.sections} шт.%0AМатериал каркаса: ${params.frame}%0AЦвет ткани: ${params.color}%0AСтоимость: ${Math.round(calcResults.total).toLocaleString()} ₽%0AПредоплата (${CALC_CONFIG.prepaymentRate * 100}%25): ${calcResults.prepayment.toLocaleString()} ₽%0AСрок изготовления: ${calcResults.term} рабочих дней%0A%0APDF-расчёт прикреплён.`;
-                  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${body}`;
-                  setShowShare(false);
-                }}
-                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                Email
-              </button>
-              <button
-                onClick={() => setShowShare(false)}
-                className="w-full py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors"
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    
     </div>
   );
 }
