@@ -231,7 +231,9 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ширина проёма (мм)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Ширина проёма (мм) <span className="text-indigo-500 font-black">{params.width.toLocaleString()}</span>
+                  </label>
                   <input 
                     type="text" 
                     inputMode="numeric"
@@ -240,9 +242,17 @@ export default function App() {
                     placeholder="2000" 
                     onChange={(e) => handleNumChange('width', e.target.value)}
                   />
+                  <input
+                    type="range" min="500" max="5000" step="100"
+                    value={params.width}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-600"
+                    onChange={(e) => setParams(prev => ({ ...prev, width: Number(e.target.value) }))}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Высота секции (мм)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Высота секции (мм) <span className="text-indigo-500 font-black">{params.height.toLocaleString()}</span>
+                  </label>
                   <input 
                     type="text" 
                     inputMode="numeric"
@@ -250,6 +260,12 @@ export default function App() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
                     placeholder="1800" 
                     onChange={(e) => handleNumChange('height', e.target.value)}
+                  />
+                  <input
+                    type="range" min="500" max="3000" step="100"
+                    value={params.height}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-600"
+                    onChange={(e) => setParams(prev => ({ ...prev, height: Number(e.target.value) }))}
                   />
                 </div>
               </div>
