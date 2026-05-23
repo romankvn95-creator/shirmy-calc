@@ -15,6 +15,7 @@ input[type='range']::-webkit-slider-thumb {
   cursor: pointer;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
   transition: box-shadow 0.15s ease;
+  margin-top: -5px;
 }
 input[type='range']::-webkit-slider-thumb:hover {
   box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.25);
