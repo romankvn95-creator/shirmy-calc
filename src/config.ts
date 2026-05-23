@@ -1,8 +1,8 @@
 export const CALC_CONFIG = {
   sectionWidth: 600,
   basePrices: [
-    { maxH: 1500, price: 2000 },
-    { maxH: 1800, price: 2500 },
+    { maxH: 1500, price: 2800 },
+    { maxH: 2200, price: 3300 },
   ],
   heightSurchargeRate: 0.10, // 10%
   heightSurchargeStep: 200,   // per 200mm (20cm)
