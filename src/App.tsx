@@ -119,10 +119,18 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
     const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
     const frameStrokeColor = frameData?.color || '#8b5e3c';
 
-    // 2. Base price per section based on height (from config)
-    const lastPrice = CALC_CONFIG.basePrices[CALC_CONFIG.basePrices.length - 1].price;
-    const foundPrice = CALC_CONFIG.basePrices.find(bp => params.height <= bp.maxH);
-    let pricePerSection = foundPrice ? foundPrice.price : lastPrice + Math.ceil((params.height - CALC_CONFIG.basePrices[CALC_CONFIG.basePrices.length - 1].maxH) / CALC_CONFIG.heightSurchargeStep) * Math.round(lastPrice * CALC_CONFIG.heightSurchargeRate);
+    // 2. Base price per section based on height
+    let pricePerSection = 2500; // default for 1800
+    if (params.height <= 1500) {
+      pricePerSection = 2000;
+    } else if (params.height <= 1800) {
+      pricePerSection = 2500;
+    } else {
+      // Height above 1800: +10% for every 200mm (20cm)
+      const extraHeight = params.height - 1800;
+      const steps = Math.ceil(extraHeight / CALC_CONFIG.heightSurchargeStep);
+      pricePerSection = 2500 * (1 + (steps * CALC_CONFIG.heightSurchargeRate));
+    }
 
     // 3. Total base
     let total = pricePerSection * sections;
