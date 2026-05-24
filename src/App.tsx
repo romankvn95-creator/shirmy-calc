@@ -1,109 +1,114 @@
-import { useState, useMemo } from 'react';
-import { Download, Copy, Check, LayoutGrid, RefreshCw, FileText } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Download, FileText, User, Briefcase, LayoutGrid, ChevronDown, RefreshCw, Plus, Minus, Copy, Check } from 'lucide-react';
 import { CALC_CONFIG, demoGallery } from './config';
+
+function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string }) {
+  return (
+    <span>
+      {Math.round(value).toLocaleString()}{suffix}
+    </span>
+  );
+}
+
+function SVGAnimatedNumber({ value, x, y, className, transform, textAnchor, suffix = "" }: { value: number, x: number | string, y: number | string, className?: string, transform?: string, textAnchor?: string, suffix?: string }) {
+  return (
+    <text x={x} y={y} className={className} transform={transform} textAnchor={textAnchor}>
+      {Math.round(value).toLocaleString()}{suffix}
+    </text>
+  );
+}
 
 export default function App() {
   const [selectedImage, setSelectedImage] = useState<typeof demoGallery[0] | null>(null);
   const [showKP, setShowKP] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
   const [mode, setMode] = useState<'client' | 'manager'>('client');
+  const [isCopied, setIsCopied] = useState(false);
+  const kpRef = useRef<HTMLDivElement>(null);
   const [params, setParams] = useState({
     width: 2000, height: 1800, color: 'Белый', frame: 'Дерево', customer: ''
   });
 
-  // ── PDF: открыть чистый HTML-документ в новом окне и напечатать ──────
-  const handleSavePDF = () => {
-    const kpNum = Math.floor(Math.random() * 90000) + 10000;
-    const dateStr = new Date().toLocaleDateString('ru-RU');
-    const html = `<!DOCTYPE html>
-<html lang="ru"><head><meta charset="UTF-8">
-<title>КП №${kpNum} от ${dateStr}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-@page{margin:15mm 20mm}
-body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-height:1.5}
-.hdr{background:#0f172a;color:#fff;padding:16pt 20pt;margin-bottom:20pt}
-.hdr h1{font-size:18pt;font-weight:900;text-transform:uppercase;letter-spacing:1px}
-.hdr p{color:#94a3b8;font-size:9pt;margin-top:3pt}
-.row{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e2e8f0;padding-bottom:12pt;margin-bottom:16pt;gap:20pt}
-.lbl{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:3pt}
-.val{font-size:13pt;font-weight:700}
-.section-title{font-size:9pt;font-weight:900;color:#4f46e5;text-transform:uppercase;letter-spacing:2px;border-left:3px solid #4f46e5;padding-left:8pt;margin:16pt 0 10pt}
-.specs{display:grid;grid-template-columns:1fr 1fr;gap:6pt 30pt;margin-bottom:16pt}
-.spec{display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding:5pt 0}
-.spec span:first-child{color:#64748b}
-.spec span:last-child{font-weight:700}
-.total-block{display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid #0f172a;padding-top:16pt;margin-top:8pt;gap:20pt}
-.terms .t1{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:5pt}
-.terms .t2{font-size:13pt;font-weight:700}
-.terms .t3{color:#64748b;font-size:10pt;margin-top:3pt}
-.terms .t3 b{color:#4f46e5}
-.price-block{text-align:right}
-.price-block .pl{font-size:9pt;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:4pt}
-.price-block .pv{font-size:30pt;font-weight:900;letter-spacing:-1px;line-height:1}
-.disclaimer{margin-top:14pt;background:#fffbeb;border-left:3px solid #f59e0b;padding:8pt 10pt;font-size:9pt;color:#92400e;line-height:1.5}
-@media print{body{padding:0}}
-</style></head><body>
-<div class="hdr"><h1>Коммерческое предложение</h1><p>№ ${kpNum} &nbsp;&bull;&nbsp; ${dateStr}</p></div>
-<div class="row">
-  <div><div class="lbl">Поставщик</div><div class="val">Ширмы и Перегородки</div></div>
-  <div style="text-align:right"><div class="lbl">Заказчик</div><div class="val">${params.customer || 'Частный клиент'}</div></div>
-</div>
-<div class="section-title">Технические характеристики</div>
-<div class="specs">
-  <div class="spec"><span>Ширина проёма</span><span>${params.width} мм</span></div>
-  <div class="spec"><span>Высота секции</span><span>${params.height} мм</span></div>
-  <div class="spec"><span>Кол-во секций</span><span>${calcResults.sections} шт.</span></div>
-  <div class="spec"><span>Цвет ткани</span><span>${params.color}</span></div>
-  <div class="spec"><span>Материал каркаса</span><span>${params.frame}</span></div>
-  <div class="spec"><span>Наполнение</span><span>Нейлон</span></div>
-</div>
-<div class="total-block">
-  <div class="terms">
-    <div class="t1">Условия поставки</div>
-    <div class="t2">Срок изготовления: ${calcResults.term} рабочих дней</div>
-    <div class="t3">Предоплата ${CALC_CONFIG.prepaymentRate * 100}%: <b>${calcResults.prepayment.toLocaleString()} ₽</b></div>
-  </div>
-  <div class="price-block">
-    <div class="pl">Итого к оплате</div>
-    <div class="pv">${Math.round(calcResults.total).toLocaleString()} ₽</div>
-  </div>
-</div>
-<div class="disclaimer">Предварительный расчёт действителен 5 рабочих дней. Для оформления заказа свяжитесь с нами.</div>
-<script>window.onload=function(){window.print();}<\/script>
-</body></html>`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+  const handleCopyText = async () => {
+    const text = `📋 *КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ*
+${params.customer ? `👤 Клиент: ${params.customer}` : ''}
+---------------------------
+📏 *ПАРАМЕТРЫ ШИРМЫ:*
+• Ширина: ${params.width} мм
+• Высота: ${params.height} мм
+• Цвет ткани: ${params.color}
+• Каркас: ${params.frame}
+• Кол-во секций: ${calcResults.sections} шт.
+
+💰 *РАСЧЁТ СТОИМОСТИ:*
+• Цена за секцию: ${Math.round(calcResults.pricePerSection).toLocaleString()} ₽
+• Итого цена: *${Math.round(calcResults.total).toLocaleString()} ₽*
+• Предоплата: ${Math.round(calcResults.prepayment).toLocaleString()} ₽
+
+📝 *УСЛОВИЯ:*
+• Срок изготовления: 3-5 рабочих дней
+• Гарантия: 12 месяцев
+
+_Сформировано в Калькуляторе ширм v1.0.1_`;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
-  // ── Копировать текст КП ─────────────────────────────────────────────────
-  const handleCopyText = () => {
-    const lines = [
-      '📋 КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ',
-      '',
-      params.customer ? `👤 Заказчик: ${params.customer}` : '👤 Заказчик: Частный клиент',
-      `📅 Дата: ${new Date().toLocaleDateString('ru-RU')}`,
-      '',
-      '📐 ПАРАМЕТРЫ ШИРМЫ:',
-      `• Ширина проёма: ${params.width} мм`,
-      `• Высота секции: ${params.height} мм`,
-      `• Количество секций: ${calcResults.sections} шт.`,
-      `• Материал каркаса: ${params.frame}`,
-      `• Цвет ткани: ${params.color}`,
-      `• Наполнение: Нейлон`,
-      '',
-      '💰 СТОИМОСТЬ:',
-      `• Итого: ${Math.round(calcResults.total).toLocaleString()} ₽`,
-      `• Предоплата 70%: ${calcResults.prepayment.toLocaleString()} ₽`,
-      `• Срок изготовления: ${calcResults.term} рабочих дней`,
-      '',
-      '⚡ Расчёт действителен 5 рабочих дней.',
-    ];
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2500);
-    });
+  const handleSavePDF = () => {
+    if (!kpRef.current) return;
+    
+    const html = kpRef.current.innerHTML;
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(node => node.outerHTML)
+      .join('\n');
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>КП_${params.customer || 'Client'}</title>
+            ${styles}
+            <style>
+              @media print {
+                body { margin: 0; padding: 0; background: white !important; }
+                .custom-scrollbar { overflow: visible !important; height: auto !important; }
+                @page { margin: 10mm; }
+              }
+              body { padding: 40px; background: white !important; }
+              .custom-scrollbar { overflow: visible !important; height: auto !important; }
+            </style>
+          </head>
+          <body>
+            <div class="bg-white">
+              ${html}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const handleNumChange = (key: string, val: string) => {
@@ -119,16 +124,20 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
     const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
     const frameStrokeColor = frameData?.color || '#8b5e3c';
 
-    // 2. Base price per section based on height (from config.basePrices)
-    const sortedPrices = [...CALC_CONFIG.basePrices].sort((a, b) => a.maxH - b.maxH);
-    const priceEntry = sortedPrices.find(p => params.height <= p.maxH) || sortedPrices[sortedPrices.length - 1];
-    let pricePerSection = priceEntry.price;
-    // For heights above the last tier, add surcharge
-    if (!sortedPrices.find(p => params.height <= p.maxH)) {
-      const lastMaxH = sortedPrices[sortedPrices.length - 1].maxH;
-      const extraHeight = params.height - lastMaxH;
-      const steps = Math.ceil(extraHeight / CALC_CONFIG.heightSurchargeStep);
-      pricePerSection = priceEntry.price * (1 + (steps * CALC_CONFIG.heightSurchargeRate));
+    // 2. Base price per section based on height (Linear scaling 2800 - 3300)
+    const hMin = 1500;
+    const hMax = 2200;
+    const pMin = CALC_CONFIG.basePrices[0].price; // 2800
+    const pMax = CALC_CONFIG.basePrices[1].price; // 3300
+    
+    let pricePerSection = pMin;
+    if (params.height <= hMin) {
+      pricePerSection = pMin;
+    } else if (params.height >= hMax) {
+      pricePerSection = pMax;
+    } else {
+      const ratio = (params.height - hMin) / (hMax - hMin);
+      pricePerSection = pMin + ratio * (pMax - pMin);
     }
 
     // 3. Total base
@@ -146,10 +155,16 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
       total *= (1 + CALC_CONFIG.nonStandardPenalty);
     }
 
-    const prepayment = Math.ceil(total * CALC_CONFIG.prepaymentRate * 100) / 100;
-    const cost = total / CALC_CONFIG.markup;
-    const margin = total - cost;
-    const managerEarnings = margin * CALC_CONFIG.commissionRate;
+    // Округление общей суммы до ближайших 100 руб в большую сторону
+    total = Math.ceil(total / 100) * 100;
+
+    // Округление предоплаты до ближайших 100 руб в большую сторону
+    const prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 100) * 100;
+    
+    // Округление всех менеджерских показателей в большую сторону до 100
+    const cost = Math.ceil((total / CALC_CONFIG.markup) / 100) * 100;
+    const margin = Math.ceil((total - cost) / 100) * 100;
+    const managerEarnings = Math.ceil((margin * CALC_CONFIG.commissionRate) / 100) * 100;
 
     return { 
       sections, 
@@ -206,11 +221,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
             <g key={i}>
               <rect 
                 x={startX + i * sectionW} 
+                width={sectionW}
+                fill={fillColor}
+                stroke={frameStrokeColor}
                 y={frontY} 
-                width={sectionW} 
                 height={totalH} 
-                fill={fillColor} 
-                stroke={frameStrokeColor} 
                 strokeWidth="2"
               />
               {/* Wheels for high screen */}
@@ -222,7 +237,10 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
               )}
               {/* Fabric texture lines if light color */}
               {params.color !== 'Чёрный' && (
-                <path d={`M ${startX + i * sectionW + 5} ${frontY} L ${startX + (i+1) * sectionW - 5} ${frontY + totalH}`} stroke="#000" strokeOpacity="0.03" strokeWidth="0.5" />
+                <path 
+                  d={`M ${startX + i * sectionW + 5} ${frontY} L ${startX + (i+1) * sectionW - 5} ${frontY + totalH}`}
+                  stroke="#000" strokeOpacity="0.03" strokeWidth="0.5" 
+                />
               )}
             </g>
           ))}
@@ -235,7 +253,15 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
             <line x1={startX - 15} y1={frontY} x2={startX - 15} y2={frontY + totalH} stroke="currentColor" strokeWidth="1" strokeDasharray="2"/>
             <line x1={startX - 20} y1={frontY} x2={startX - 10} y2={frontY} stroke="currentColor" strokeWidth="1"/>
             <line x1={startX - 20} y1={frontY + totalH} x2={startX - 10} y2={frontY + totalH} stroke="currentColor" strokeWidth="1"/>
-            <text x={startX - 25} y={frontY + totalH/2} textAnchor="middle" className="text-[10px] font-bold fill-slate-500" transform={`rotate(-90 ${startX - 25},${frontY + totalH/2})`}>{params.height} мм</text>
+            <SVGAnimatedNumber 
+              value={params.height}
+              x={startX - 25}
+              y={frontY + totalH/2}
+              textAnchor="middle"
+              className="text-[10px] font-bold fill-slate-500"
+              transform={`rotate(-90 ${startX - 25},${frontY + totalH/2})`}
+              suffix=" мм"
+            />
           </g>
         </g>
 
@@ -243,7 +269,14 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
         <g>
           <line x1={startX} y1={topViewY + 35} x2={startX + totalW} y2={topViewY + 35} stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 2" />
           <path d={`M ${startX} ${topViewY + 32} L ${startX} ${topViewY + 38} M ${startX + totalW} ${topViewY + 32} L ${startX + totalW} ${topViewY + 38}`} stroke="#94a3b8" strokeWidth="1" />
-          <text x={startX + totalW/2} y={topViewY + 48} textAnchor="middle" className="text-[9px] font-bold fill-slate-500">Ширина проёма: {params.width} мм</text>
+          <SVGAnimatedNumber 
+            value={params.width}
+            x={startX + totalW/2}
+            y={topViewY + 48}
+            textAnchor="middle"
+            className="text-[9px] font-bold fill-slate-500"
+            suffix=" мм"
+          />
 
           {[...Array(sectionsCount)].map((_, i) => {
             const isBack = i % 2 === 0;
@@ -257,15 +290,19 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
                 {/* Section line with thickness */}
                 <line 
                   x1={x1} y1={y1} x2={x2} y2={y2} 
-                  stroke={frameStrokeColor} strokeWidth="5" strokeLinecap="round" 
+                  stroke={frameStrokeColor}
+                  strokeWidth="5" strokeLinecap="round" 
                 />
                 <line 
                   x1={x1} y1={y1} x2={x2} y2={y2} 
-                  stroke={fillColor} strokeWidth="3" strokeLinecap="round" 
+                  stroke={fillColor}
+                  strokeWidth="3" strokeLinecap="round" 
                 />
                 {/* Hinge point */}
-                <circle cx={x1} cy={y1} r="2.5" fill={frameStrokeColor} />
-                {i === sectionsCount - 1 && <circle cx={x2} cy={y2} r="2.5" fill={frameStrokeColor} />}
+                <circle cx={x1} cy={y1} fill={frameStrokeColor} r="2.5" />
+                {i === sectionsCount - 1 && (
+                  <circle cx={x2} cy={y2} fill={frameStrokeColor} r="2.5" />
+                )}
                 
                 {/* Section width label for the first section */}
                 {i === 0 && (
@@ -286,7 +323,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0"><LayoutGrid className="text-white" size={16}/></div>
             <div className="min-w-0">
               <h1 className="font-bold text-xs sm:text-sm md:text-lg leading-tight tracking-tight text-slate-900 break-words sm:whitespace-normal">Калькулятор ширм и перегородок</h1>
-              <p className="hidden md:block text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Система предварительного расчёта</p>
+              <p className="hidden md:block text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Система предварительного расчёта • v1.0.1</p>
             </div>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
@@ -326,44 +363,62 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Ширина проёма (мм)
-                  </label>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    value={params.width === 0 ? '' : params.width} 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                    placeholder="2000" 
-                    onChange={(e) => handleNumChange('width', e.target.value)}
-                  />
-                  <input
-                    type="range" min="500" max="5000" step="100"
-                    value={params.width}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-600"
-                    style={{ background: `linear-gradient(to right, #4f46e5 ${((params.width - 500) / 4500) * 100}%, #e2e8f0 ${((params.width - 500) / 4500) * 100}%)` }}
-                    onChange={(e) => setParams(prev => ({ ...prev, width: Number(e.target.value) }))}
-                  />
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ширина проёма (мм)</label>
+                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                      <AnimatedNumber value={params.width} />
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      value={params.width === 0 ? '' : params.width} 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
+                      placeholder="2000" 
+                      onChange={(e) => handleNumChange('width', e.target.value)}
+                    />
+                    <div className="px-1">
+                      <input 
+                        type="range"
+                        min="600"
+                        max="6000"
+                        step="10"
+                        value={params.width}
+                        onChange={(e) => setParams(prev => ({ ...prev, width: Number(e.target.value) }))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Высота секции (мм)
-                  </label>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    value={params.height === 0 ? '' : params.height} 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                    placeholder="1800" 
-                    onChange={(e) => handleNumChange('height', e.target.value)}
-                  />
-                  <input
-                    type="range" min="500" max="3000" step="100"
-                    value={params.height}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-600"
-                    style={{ background: `linear-gradient(to right, #4f46e5 ${((params.height - 500) / 2500) * 100}%, #e2e8f0 ${((params.height - 500) / 2500) * 100}%)` }}
-                    onChange={(e) => setParams(prev => ({ ...prev, height: Number(e.target.value) }))}
-                  />
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Высота секции (мм)</label>
+                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                      <AnimatedNumber value={params.height} />
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      value={params.height === 0 ? '' : params.height} 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
+                      placeholder="1800" 
+                      onChange={(e) => handleNumChange('height', e.target.value)}
+                    />
+                    <div className="px-1">
+                      <input 
+                        type="range"
+                        min="1000"
+                        max="3000"
+                        step="10"
+                        value={params.height}
+                        onChange={(e) => setParams(prev => ({ ...prev, height: Number(e.target.value) }))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -452,14 +507,18 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
           <div className="mb-auto relative z-10">
             <div className="text-slate-400 text-[10px] md:text-xs uppercase tracking-[0.2em] font-bold mb-2">Общая стоимость</div>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl md:text-6xl font-black tracking-tight leading-none">{Math.round(calcResults.total).toLocaleString()}</span>
+              <span className="text-5xl md:text-6xl font-black tracking-tight leading-none">
+                <AnimatedNumber value={calcResults.total} />
+              </span>
               <span className="text-2xl font-bold text-slate-500">₽</span>
             </div>
             
             <div className="mt-6 flex flex-col gap-2 pt-6 border-t border-white/10">
               <div className="flex justify-between items-center">
                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Предоплата {CALC_CONFIG.prepaymentRate * 100}%:</span>
-                 <span className="text-lg font-black text-indigo-400">{calcResults.prepayment.toLocaleString()} ₽</span>
+                 <span className="text-lg font-black text-indigo-400">
+                   <AnimatedNumber value={calcResults.prepayment} suffix=" ₽" />
+                 </span>
               </div>
             </div>
             
@@ -467,19 +526,27 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
               <div className="mt-4 space-y-2 pt-4 border-t border-white/5 animate-in fade-in duration-500">
                 <div className="flex justify-between text-[10px] text-slate-400 uppercase font-black">
                   <span>Цена за секцию:</span>
-                  <span className="text-white">{Math.round(calcResults.pricePerSection).toLocaleString()} ₽</span>
+                  <span className="text-white">
+                    <AnimatedNumber value={calcResults.pricePerSection} suffix=" ₽" />
+                  </span>
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400 uppercase font-black pt-2">
                   <span>Себестоимость:</span>
-                  <span className="text-slate-300">{Math.round(calcResults.cost).toLocaleString()} ₽</span>
+                  <span className="text-slate-300">
+                    <AnimatedNumber value={calcResults.cost} suffix=" ₽" />
+                  </span>
                 </div>
                 <div className="flex justify-between text-[10px] text-emerald-400 uppercase font-black">
                   <span>Маржа:</span>
-                  <span>{Math.round(calcResults.margin).toLocaleString()} ₽</span>
+                  <span>
+                    <AnimatedNumber value={calcResults.margin} suffix=" ₽" />
+                  </span>
                 </div>
                 <div className="flex justify-between text-[10px] text-orange-400 uppercase font-black mt-2 bg-white/5 p-2 rounded-lg border border-orange-500/20">
                   <span>Заработок (20%):</span>
-                  <span>{Math.round(calcResults.managerEarnings).toLocaleString()} ₽</span>
+                  <span>
+                    <AnimatedNumber value={calcResults.managerEarnings} suffix=" ₽" />
+                  </span>
                 </div>
               </div>
             )}
@@ -513,20 +580,28 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
              </div>
              <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Цена за секцию</span>
-                <span className="font-bold text-slate-700">{Math.round(calcResults.pricePerSection).toLocaleString()} ₽</span>
+                <span className="font-bold text-slate-700">
+                  <AnimatedNumber value={calcResults.pricePerSection} suffix=" ₽" />
+                </span>
              </div>
              <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Кол-во секций</span>
-                <span className="font-bold text-slate-700">{calcResults.sections} шт</span>
+                <span className="font-bold text-slate-700">
+                  <AnimatedNumber value={calcResults.sections} suffix=" шт" />
+                </span>
              </div>
              <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Предоплата {CALC_CONFIG.prepaymentRate * 100}%</span>
-                <span className="font-bold text-indigo-600">{calcResults.prepayment.toLocaleString()} ₽</span>
+                <span className="font-bold text-indigo-600">
+                  <AnimatedNumber value={calcResults.prepayment} suffix=" ₽" />
+                </span>
              </div>
              <div className="w-full h-px bg-slate-50 my-1"></div>
              <div className="flex justify-between items-center text-xs font-bold text-slate-900 pt-1">
                 <span>Итого к оплате</span>
-                <span>{Math.round(calcResults.total).toLocaleString()} ₽</span>
+                <span>
+                  <AnimatedNumber value={calcResults.total} suffix=" ₽" />
+                </span>
              </div>
            </div>
         </div>
@@ -608,7 +683,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
       {/* Commercial Proposal (KP) Modal */}
       {showKP && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md overflow-hidden">
-          <div id="kp-printable" className="bg-white w-full max-w-2xl h-full max-h-[95vh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-white w-full max-w-2xl h-full max-h-[95vh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
             {/* KP Header */}
             <div className="bg-slate-900 p-5 sm:p-8 text-white flex justify-between items-center">
               <div>
@@ -621,7 +696,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
             </div>
 
             {/* KP Content */}
-            <div className="flex-1 overflow-y-auto p-5 sm:p-10 space-y-6 sm:space-y-8 custom-scrollbar">
+            <div ref={kpRef} className="flex-1 overflow-y-auto p-5 sm:p-10 space-y-6 sm:space-y-8 custom-scrollbar bg-white">
               <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-100 pb-5 sm:pb-6 gap-4">
                 <div>
                   <h3 className="font-bold text-slate-900 mb-1">Калькулятор ширм и перегородок</h3>
@@ -670,38 +745,37 @@ body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:11pt;line-he
               </div>
             </div>
 
-            {/* KP Footer */}
-            <div id="kp-footer" className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button 
-                  onClick={handleSavePDF}
-                  className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95"
-                >
-                  <Download size={18} /> Сохранить PDF
-                </button>
-                <button 
-                  onClick={() => setShowKP(false)}
-                  className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors"
-                >
-                  Вернуться
-                </button>
-              </div>
-              <button
-                onClick={handleCopyText}
-                className={`w-full py-3 rounded-xl sm:rounded-2xl font-bold text-sm flex items-center justify-center gap-2 border transition-all active:scale-95 ${
-                  isCopied
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                    : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-700'
-                }`}
+            <div className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={handleSavePDF}
+                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95"
               >
-                {isCopied ? <Check size={16} /> : <Copy size={16} />}
-                {isCopied ? '✓ Скопировано!' : 'Копировать текст (для Авито / мессенджеров)'}
+                <Download size={18} /> Сохранить PDF
+              </button>
+              <button 
+                onClick={handleCopyText}
+                className={`flex-[2] py-3 sm:py-4 font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${isCopied ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                {isCopied ? (
+                  <>
+                    <Check size={18} /> Скопировано!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={18} /> Копировать текст (для Авито / мессенджеров)
+                  </>
+                )}
+              </button>
+              <button 
+                onClick={() => setShowKP(false)}
+                className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors"
+              >
+                Вернуться
               </button>
             </div>
           </div>
         </div>
       )}
-    
     </div>
   );
 }

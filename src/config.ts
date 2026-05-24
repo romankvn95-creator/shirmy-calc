@@ -4,8 +4,6 @@ export const CALC_CONFIG = {
     { maxH: 1500, price: 2800 },
     { maxH: 2200, price: 3300 },
   ],
-  heightSurchargeRate: 0.10, // 10%
-  heightSurchargeStep: 200,   // per 200mm (20cm)
   nonStandardPenalty: 0.05,  // 5%
   colors: ['Белый', 'Чёрный', 'Бежевый', 'Серый'],
   frameMaterials: [

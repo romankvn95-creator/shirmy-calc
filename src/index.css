@@ -1,53 +1,5 @@
 @import "tailwindcss";
 
-/* ── Кастомный скроллбар ─────────────────────────── */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
-
-/* ── Ползунки: убрать системный вид ─────────────── */
 input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #4f46e5;
-  cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-  transition: box-shadow 0.15s ease;
   margin-top: -5px;
-}
-input[type='range']::-webkit-slider-thumb:hover {
-  box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.25);
-}
-input[type='range']::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
-}
-input[type='range']::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: none;
-  border-radius: 50%;
-  background: #4f46e5;
-  cursor: pointer;
-}
-
-/* ── Печать: показывать только КП ────────────────── */
-@media print {
-  body * { visibility: hidden !important; }
-  #kp-printable,
-  #kp-printable * { visibility: visible !important; }
-  #kp-printable {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    z-index: 9999;
-  }
-  #kp-footer { display: none !important; }
 }
