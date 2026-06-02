@@ -70,44 +70,196 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
     }
   };
 
-  const handleSavePDF = () => {
-    if (!kpRef.current) return;
-    
-    const html = kpRef.current.innerHTML;
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map(node => node.outerHTML)
-      .join('\n');
-    
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>КП_${params.customer || 'Client'}</title>
-            ${styles}
-            <style>
-              @media print {
-                body { margin: 0; padding: 0; background: white !important; }
-                .custom-scrollbar { overflow: visible !important; height: auto !important; }
-                @page { margin: 10mm; }
-              }
-              body { padding: 40px; background: white !important; }
-              .custom-scrollbar { overflow: visible !important; height: auto !important; }
-            </style>
-          </head>
-          <body>
-            <div class="bg-white">
-              ${html}
+  const [isSavingPDF, setIsSavingPDF] = useState(false);
+
+  // Транслитерация имени клиента для имени файла (Авито/мессенджеры режут кириллицу)
+  const translit = (str: string) => {
+    const map: Record<string, string> = {
+      а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',
+      н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',
+      ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'
+    };
+    return str.toLowerCase().split('').map(ch => {
+      if (map[ch] !== undefined) {
+        const t = map[ch];
+        return t;
+      }
+      return /[a-z0-9]/i.test(ch) ? ch : (ch === ' ' ? ' ' : '');
+    }).join('')
+      .split(' ').filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join('');
+  };
+
+  // Технический эскиз в виде самостоятельного SVG (инлайн-цвета, без Tailwind)
+  const buildSketchSVG = () => {
+    const totalW = 320, totalH = 110, startX = 40, frontY = 35, topViewY = 175;
+    const sectionsCount = calcResults.sections;
+    const sectionW = totalW / sectionsCount;
+    const hasWheels = params.height >= 2000;
+    const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
+    const frameStroke = frameData?.color || '#8b5e3c';
+    const colorMap: Record<string, string> = { 'Белый':'#ffffff','Чёрный':'#1e293b','Бежевый':'#f5f5dc','Серый':'#94a3b8' };
+    const fill = colorMap[params.color] || '#ffffff';
+
+    let front = '';
+    let top = '';
+    for (let i = 0; i < sectionsCount; i++) {
+      const x = startX + i * sectionW;
+      front += `<rect x="${x}" y="${frontY}" width="${sectionW}" height="${totalH}" fill="${fill}" stroke="${frameStroke}" stroke-width="2"/>`;
+      if (hasWheels) {
+        front += `<circle cx="${x + sectionW*0.25}" cy="${frontY+totalH+4}" r="3" fill="#475569"/><circle cx="${x + sectionW*0.75}" cy="${frontY+totalH+4}" r="3" fill="#475569"/>`;
+      }
+      const isBack = i % 2 === 0;
+      const x1 = x, x2 = startX + (i+1) * sectionW;
+      const y1 = topViewY + (isBack ? 20 : 0), y2 = topViewY + (isBack ? 0 : 20);
+      top += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${frameStroke}" stroke-width="5" stroke-linecap="round"/>`;
+      top += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${fill}" stroke-width="3" stroke-linecap="round"/>`;
+      top += `<circle cx="${x1}" cy="${y1}" r="2.5" fill="${frameStroke}"/>`;
+    }
+
+    return `<svg viewBox="0 0 400 240" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <text x="200" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1" letter-spacing="2" style="text-transform:uppercase">Вид спереди</text>
+      <text x="200" y="155" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1" letter-spacing="2" style="text-transform:uppercase">Вид сверху (гармошка)</text>
+      <ellipse cx="200" cy="${frontY+totalH+5}" rx="160" ry="3" fill="black" fill-opacity="0.05"/>
+      <rect x="${startX}" y="${frontY}" width="${totalW}" height="${totalH}" fill="white" stroke="#94a3b8" stroke-width="0.5"/>
+      ${front}
+      ${hasWheels ? `<text x="${startX+totalW+10}" y="${frontY+totalH+8}" font-size="9" font-weight="700" fill="#4f46e5">На колёсах</text>` : ''}
+      <line x1="${startX-15}" y1="${frontY}" x2="${startX-15}" y2="${frontY+totalH}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2"/>
+      <line x1="${startX-20}" y1="${frontY}" x2="${startX-10}" y2="${frontY}" stroke="#94a3b8" stroke-width="1"/>
+      <line x1="${startX-20}" y1="${frontY+totalH}" x2="${startX-10}" y2="${frontY+totalH}" stroke="#94a3b8" stroke-width="1"/>
+      <text x="${startX-25}" y="${frontY+totalH/2}" text-anchor="middle" font-size="10" font-weight="700" fill="#64748b" transform="rotate(-90 ${startX-25},${frontY+totalH/2})">${params.height} мм</text>
+      <line x1="${startX}" y1="${topViewY+35}" x2="${startX+totalW}" y2="${topViewY+35}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 2"/>
+      <text x="${startX+totalW/2}" y="${topViewY+48}" text-anchor="middle" font-size="9" font-weight="700" fill="#64748b">${params.width} мм</text>
+      ${top}
+    </svg>`;
+  };
+
+  const handleSavePDF = async () => {
+    if (isSavingPDF) return;
+    setIsSavingPDF(true);
+    try {
+      const [{ jsPDF }, html2canvasMod] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
+      const html2canvas = (html2canvasMod as any).default || html2canvasMod;
+
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dateStr = `${dd}.${mm}`;
+      const kpNo = String(Math.floor(Math.random() * 90000) + 10000);
+      const customer = (params.customer || '').trim();
+      const fileNamePart = customer ? translit(customer) : 'Client';
+      const fileName = `KP_${fileNamePart}_${dateStr}.pdf`;
+
+      const rows = [
+        ['Ширина проёма', `${params.width} мм`],
+        ['Высота секции', `${params.height} мм`],
+        ['Кол-во секций', `${calcResults.sections} шт.`],
+        ['Цвет ткани', params.color],
+        ['Каркас', params.frame],
+        ['Наполнение', 'Нейлон'],
+      ].map(([k, v]) => `<div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding:7px 0;font-size:14px"><span style="color:#94a3b8">${k}:</span><span style="font-weight:700;color:#0f172a">${v}</span></div>`).join('');
+
+      const docHtml = `<!doctype html><html><head><meta charset="utf-8">
+        <style>
+          *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:#ffffff;color:#0f172a}
+          #page{width:794px;background:#ffffff;padding:48px 44px}
+        </style></head><body>
+        <div id="page">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;background:#0f172a;color:#fff;border-radius:16px;padding:24px 28px">
+            <div>
+              <div style="font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:-0.5px;line-height:1.1">Коммерческое<br>предложение</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:8px">№ ${kpNo} от ${now.toLocaleDateString('ru-RU')}</div>
             </div>
-            <script>
-              window.onload = function() {
-                window.print();
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+            <div style="text-align:right">
+              <div style="font-size:15px;font-weight:800">Ширмы и перегородки</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px">Изготовление на заказ</div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e2e8f0;padding:22px 4px;margin-top:8px">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#0f172a">Калькулятор ширм и перегородок</div>
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-top:3px">Расчёт конструкций</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Заказчик</div>
+              <div style="font-size:16px;font-weight:700;color:#0f172a;margin-top:3px">${customer || 'Частный клиент'}</div>
+            </div>
+          </div>
+
+          <div style="margin-top:26px">
+            <div style="font-size:11px;font-weight:800;color:#4f46e5;text-transform:uppercase;letter-spacing:2px;border-left:3px solid #4f46e5;padding-left:8px;margin-bottom:14px">Технические характеристики</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 36px">${rows}</div>
+          </div>
+
+          <div style="margin-top:26px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px">
+            <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px">Схематичное изображение</div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px">${buildSketchSVG()}</div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid #0f172a;padding-top:22px;margin-top:28px">
+            <div>
+              <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Условия поставки</div>
+              <div style="font-size:14px;font-weight:700;color:#0f172a">Срок изготовления: ${calcResults.term} рабочих дней</div>
+              <div style="font-size:12px;color:#64748b;margin-top:4px">Предоплата ${CALC_CONFIG.prepaymentRate * 100}%: <span style="font-weight:700;color:#4f46e5">${Math.round(calcResults.prepayment).toLocaleString('ru-RU')} ₽</span></div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px">Гарантия: 12 месяцев</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Всего к оплате</div>
+              <div style="font-size:38px;font-weight:800;color:#0f172a;letter-spacing:-1px;line-height:1">${Math.round(calcResults.total).toLocaleString('ru-RU')} <span style="font-size:20px">₽</span></div>
+            </div>
+          </div>
+
+          <div style="background:#fffbeb;border-left:3px solid #fbbf24;padding:12px 14px;border-radius:6px;margin-top:20px">
+            <div style="font-size:11px;color:#b45309;line-height:1.5;font-weight:500">Предварительный расчёт носит информационный характер и действителен в течение 5 рабочих дней. Точная стоимость подтверждается после замера.</div>
+          </div>
+        </div>
+      </body></html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:10px;border:0;opacity:0;';
+      document.body.appendChild(iframe);
+      const idoc = iframe.contentDocument!;
+      idoc.open(); idoc.write(docHtml); idoc.close();
+
+      await new Promise(r => setTimeout(r, 350));
+      const page = idoc.getElementById('page') as HTMLElement;
+
+      const canvas = await html2canvas(page, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 794, width: 794 });
+      document.body.removeChild(iframe);
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      const imgW = pw;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+      if (imgH <= ph) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+      } else {
+        let heightLeft = imgH;
+        let position = 0;
+        pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+        heightLeft -= ph;
+        while (heightLeft > 0) {
+          position -= ph;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+          heightLeft -= ph;
+        }
+      }
+      pdf.save(fileName);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Не удалось сформировать PDF. Попробуйте ещё раз.');
+    } finally {
+      setIsSavingPDF(false);
     }
   };
 
@@ -159,7 +311,7 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
     total = Math.ceil(total / 100) * 100;
 
     // Округление предоплаты до ближайших 100 руб в большую сторону
-    const prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 100) * 100;
+    const prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 1000) * 1000;
     
     // Округление всех менеджерских показателей в большую сторону до 100
     const cost = Math.ceil((total / CALC_CONFIG.markup) / 100) * 100;
@@ -746,11 +898,16 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
             </div>
 
             <div className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3">
-              <button 
+              <button
                 onClick={handleSavePDF}
-                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                disabled={isSavingPDF}
+                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Download size={18} /> Сохранить PDF
+                {isSavingPDF ? (
+                  <><RefreshCw size={18} className="animate-spin" /> Формирую PDF…</>
+                ) : (
+                  <><Download size={18} /> Сохранить PDF</>
+                )}
               </button>
               <button 
                 onClick={handleCopyText}
