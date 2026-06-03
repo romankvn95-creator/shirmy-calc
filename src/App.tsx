@@ -79,20 +79,15 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
       н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',
       ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'
     };
-    return str.toLowerCase().split('').map(ch => {
-      if (map[ch] !== undefined) {
-        const t = map[ch];
-        return t;
-      }
-      return /[a-z0-9]/i.test(ch) ? ch : (ch === ' ' ? ' ' : '');
-    }).join('')
+    return str.toLowerCase().split('').map(ch => map[ch] !== undefined ? map[ch] : (/[a-z0-9]/i.test(ch) ? ch : (ch === ' ' ? ' ' : '')))
+      .join('')
       .split(' ').filter(Boolean)
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
       .join('');
   };
 
-  // Технический эскиз в виде самостоятельного SVG (инлайн-цвета, без Tailwind)
-  const buildSketchSVG = () => {
+  // Внутренние элементы технического эскиза (система координат 0..400 x 0..240)
+  const buildSketchInner = () => {
     const totalW = 320, totalH = 110, startX = 40, frontY = 35, topViewY = 175;
     const sectionsCount = calcResults.sections;
     const sectionW = totalW / sectionsCount;
@@ -118,9 +113,9 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
       top += `<circle cx="${x1}" cy="${y1}" r="2.5" fill="${frameStroke}"/>`;
     }
 
-    return `<svg viewBox="0 0 400 240" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-      <text x="200" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1" letter-spacing="2" style="text-transform:uppercase">Вид спереди</text>
-      <text x="200" y="155" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1" letter-spacing="2" style="text-transform:uppercase">Вид сверху (гармошка)</text>
+    return `
+      <text x="200" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1">ВИД СПЕРЕДИ</text>
+      <text x="200" y="155" text-anchor="middle" font-size="10" font-weight="700" fill="#cbd5e1">ВИД СВЕРХУ (ГАРМОШКА)</text>
       <ellipse cx="200" cy="${frontY+totalH+5}" rx="160" ry="3" fill="black" fill-opacity="0.05"/>
       <rect x="${startX}" y="${frontY}" width="${totalW}" height="${totalH}" fill="white" stroke="#94a3b8" stroke-width="0.5"/>
       ${front}
@@ -131,7 +126,64 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
       <text x="${startX-25}" y="${frontY+totalH/2}" text-anchor="middle" font-size="10" font-weight="700" fill="#64748b" transform="rotate(-90 ${startX-25},${frontY+totalH/2})">${params.height} мм</text>
       <line x1="${startX}" y1="${topViewY+35}" x2="${startX+totalW}" y2="${topViewY+35}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 2"/>
       <text x="${startX+totalW/2}" y="${topViewY+48}" text-anchor="middle" font-size="9" font-weight="700" fill="#64748b">${params.width} мм</text>
-      ${top}
+      ${top}`;
+  };
+
+  // Полный лист КП в виде самостоятельного SVG (A4, инлайн-цвета, без Tailwind/DOM)
+  const buildKpSvg = (now: Date) => {
+    const esc = (s: any) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const kpNo = String(Math.floor(Math.random()*90000)+10000);
+    const dateFull = now.toLocaleDateString('ru-RU');
+    const customer = ((params.customer || '').trim()) || 'Частный клиент';
+    const rate = CALC_CONFIG.prepaymentRate * 100;
+    const prepay = Math.round(calcResults.prepayment).toLocaleString('ru-RU');
+    const total = Math.round(calcResults.total).toLocaleString('ru-RU');
+    const left: [string,string][] = [['Ширина проёма', params.width + ' мм'], ['Кол-во секций', calcResults.sections + ' шт.'], ['Каркас', params.frame]];
+    const right: [string,string][] = [['Высота секции', params.height + ' мм'], ['Цвет ткани', params.color], ['Наполнение', 'Нейлон']];
+    const rowY = [285, 315, 345];
+    let rows = '';
+    left.forEach(([k,v],i) => {
+      const y = rowY[i];
+      rows += `<line x1="44" y1="${y+9}" x2="384" y2="${y+9}" stroke="#f1f5f9"/>`;
+      rows += `<text x="44" y="${y}" font-size="13" fill="#94a3b8">${esc(k)}:</text>`;
+      rows += `<text x="384" y="${y}" text-anchor="end" font-size="13" font-weight="700" fill="#0f172a">${esc(v)}</text>`;
+    });
+    right.forEach(([k,v],i) => {
+      const y = rowY[i];
+      rows += `<line x1="410" y1="${y+9}" x2="750" y2="${y+9}" stroke="#f1f5f9"/>`;
+      rows += `<text x="410" y="${y}" font-size="13" fill="#94a3b8">${esc(k)}:</text>`;
+      rows += `<text x="750" y="${y}" text-anchor="end" font-size="13" font-weight="700" fill="#0f172a">${esc(v)}</text>`;
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="794" height="860" viewBox="0 0 794 860" font-family="Arial, 'Segoe UI', sans-serif">
+      <rect width="794" height="860" fill="#ffffff"/>
+      <rect x="44" y="36" width="706" height="96" rx="16" fill="#0f172a"/>
+      <text x="72" y="84" font-size="23" font-weight="800" fill="#ffffff">КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</text>
+      <text x="72" y="110" font-size="11" fill="#94a3b8">№ ${kpNo} от ${dateFull}</text>
+      <text x="722" y="78" text-anchor="end" font-size="15" font-weight="800" fill="#ffffff">Ширмы и перегородки</text>
+      <text x="722" y="100" text-anchor="end" font-size="11" fill="#94a3b8">Изготовление на заказ</text>
+      <text x="44" y="172" font-size="14" font-weight="700" fill="#0f172a">Калькулятор ширм и перегородок</text>
+      <text x="44" y="190" font-size="10" fill="#94a3b8">РАСЧЁТ КОНСТРУКЦИЙ</text>
+      <text x="750" y="165" text-anchor="end" font-size="10" font-weight="700" fill="#94a3b8">ЗАКАЗЧИК</text>
+      <text x="750" y="188" text-anchor="end" font-size="16" font-weight="700" fill="#0f172a">${esc(customer)}</text>
+      <line x1="44" y1="212" x2="750" y2="212" stroke="#e2e8f0"/>
+      <rect x="44" y="240" width="3" height="14" fill="#4f46e5"/>
+      <text x="56" y="251" font-size="11" font-weight="800" fill="#4f46e5">ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ</text>
+      ${rows}
+      <rect x="44" y="372" width="706" height="232" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="64" y="398" font-size="11" font-weight="800" fill="#94a3b8">СХЕМАТИЧНОЕ ИЗОБРАЖЕНИЕ</text>
+      <rect x="64" y="410" width="666" height="180" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+      <svg x="70" y="414" width="654" height="172" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet">${buildSketchInner()}</svg>
+      <line x1="44" y1="636" x2="750" y2="636" stroke="#0f172a" stroke-width="2"/>
+      <text x="44" y="660" font-size="10" font-weight="800" fill="#94a3b8">УСЛОВИЯ ПОСТАВКИ</text>
+      <text x="44" y="684" font-size="14" font-weight="700" fill="#0f172a">Срок изготовления: ${calcResults.term} рабочих дней</text>
+      <text x="44" y="706" font-size="12" fill="#64748b">Предоплата ${rate}%: <tspan font-weight="700" fill="#4f46e5">${prepay} ₽</tspan></text>
+      <text x="44" y="726" font-size="12" fill="#64748b">Гарантия: 12 месяцев</text>
+      <text x="750" y="658" text-anchor="end" font-size="10" font-weight="800" fill="#94a3b8">ВСЕГО К ОПЛАТЕ</text>
+      <text x="750" y="702" text-anchor="end" font-size="36" font-weight="800" fill="#0f172a">${total} ₽</text>
+      <rect x="44" y="748" width="706" height="70" rx="8" fill="#fffbeb"/>
+      <rect x="44" y="748" width="3" height="70" fill="#fbbf24"/>
+      <text x="60" y="775" font-size="11" fill="#b45309">Предварительный расчёт носит информационный характер и действителен</text>
+      <text x="60" y="793" font-size="11" fill="#b45309">в течение 5 рабочих дней. Точная стоимость подтверждается после замера.</text>
     </svg>`;
   };
 
@@ -139,121 +191,37 @@ _Сформировано в Калькуляторе ширм v1.0.1_`;
     if (isSavingPDF) return;
     setIsSavingPDF(true);
     try {
-      const [{ jsPDF }, html2canvasMod] = await Promise.all([
-        import('jspdf'),
-        import('html2canvas'),
-      ]);
-      const html2canvas = (html2canvasMod as any).default || html2canvasMod;
-
+      const { jsPDF } = await import('jspdf');
       const now = new Date();
       const dd = String(now.getDate()).padStart(2, '0');
       const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dateStr = `${dd}.${mm}`;
-      const kpNo = String(Math.floor(Math.random() * 90000) + 10000);
       const customer = (params.customer || '').trim();
-      const fileNamePart = customer ? translit(customer) : 'Client';
-      const fileName = `KP_${fileNamePart}_${dateStr}.pdf`;
+      const fileName = `KP_${customer ? translit(customer) : 'Client'}_${dd}.${mm}.pdf`;
 
-      const rows = [
-        ['Ширина проёма', `${params.width} мм`],
-        ['Высота секции', `${params.height} мм`],
-        ['Кол-во секций', `${calcResults.sections} шт.`],
-        ['Цвет ткани', params.color],
-        ['Каркас', params.frame],
-        ['Наполнение', 'Нейлон'],
-      ].map(([k, v]) => `<div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding:7px 0;font-size:14px"><span style="color:#94a3b8">${k}:</span><span style="font-weight:700;color:#0f172a">${v}</span></div>`).join('');
+      const W = 794, H = 860, scale = 2;
+      const svg = buildKpSvg(now);
+      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('SVG render failed'));
+        img.src = svgUrl;
+      });
 
-      const docHtml = `<!doctype html><html><head><meta charset="utf-8">
-        <style>
-          *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-          body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:#ffffff;color:#0f172a}
-          #page{width:794px;background:#ffffff;padding:48px 44px}
-        </style></head><body>
-        <div id="page">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;background:#0f172a;color:#fff;border-radius:16px;padding:24px 28px">
-            <div>
-              <div style="font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:-0.5px;line-height:1.1">Коммерческое<br>предложение</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:8px">№ ${kpNo} от ${now.toLocaleDateString('ru-RU')}</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:15px;font-weight:800">Ширмы и перегородки</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:4px">Изготовление на заказ</div>
-            </div>
-          </div>
-
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #e2e8f0;padding:22px 4px;margin-top:8px">
-            <div>
-              <div style="font-size:14px;font-weight:700;color:#0f172a">Калькулятор ширм и перегородок</div>
-              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-top:3px">Расчёт конструкций</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Заказчик</div>
-              <div style="font-size:16px;font-weight:700;color:#0f172a;margin-top:3px">${customer || 'Частный клиент'}</div>
-            </div>
-          </div>
-
-          <div style="margin-top:26px">
-            <div style="font-size:11px;font-weight:800;color:#4f46e5;text-transform:uppercase;letter-spacing:2px;border-left:3px solid #4f46e5;padding-left:8px;margin-bottom:14px">Технические характеристики</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 36px">${rows}</div>
-          </div>
-
-          <div style="margin-top:26px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px">
-            <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px">Схематичное изображение</div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px">${buildSketchSVG()}</div>
-          </div>
-
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid #0f172a;padding-top:22px;margin-top:28px">
-            <div>
-              <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Условия поставки</div>
-              <div style="font-size:14px;font-weight:700;color:#0f172a">Срок изготовления: ${calcResults.term} рабочих дней</div>
-              <div style="font-size:12px;color:#64748b;margin-top:4px">Предоплата ${CALC_CONFIG.prepaymentRate * 100}%: <span style="font-weight:700;color:#4f46e5">${Math.round(calcResults.prepayment).toLocaleString('ru-RU')} ₽</span></div>
-              <div style="font-size:12px;color:#64748b;margin-top:2px">Гарантия: 12 месяцев</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Всего к оплате</div>
-              <div style="font-size:38px;font-weight:800;color:#0f172a;letter-spacing:-1px;line-height:1">${Math.round(calcResults.total).toLocaleString('ru-RU')} <span style="font-size:20px">₽</span></div>
-            </div>
-          </div>
-
-          <div style="background:#fffbeb;border-left:3px solid #fbbf24;padding:12px 14px;border-radius:6px;margin-top:20px">
-            <div style="font-size:11px;color:#b45309;line-height:1.5;font-weight:500">Предварительный расчёт носит информационный характер и действителен в течение 5 рабочих дней. Точная стоимость подтверждается после замера.</div>
-          </div>
-        </div>
-      </body></html>`;
-
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:10px;border:0;opacity:0;';
-      document.body.appendChild(iframe);
-      const idoc = iframe.contentDocument!;
-      idoc.open(); idoc.write(docHtml); idoc.close();
-
-      await new Promise(r => setTimeout(r, 350));
-      const page = idoc.getElementById('page') as HTMLElement;
-
-      const canvas = await html2canvas(page, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 794, width: 794 });
-      document.body.removeChild(iframe);
+      const canvas = document.createElement('canvas');
+      canvas.width = W * scale;
+      canvas.height = H * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.drawImage(img, 0, 0, W, H);
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pw = pdf.internal.pageSize.getWidth();
-      const ph = pdf.internal.pageSize.getHeight();
-      const imgW = pw;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
-      if (imgH <= ph) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
-      } else {
-        let heightLeft = imgH;
-        let position = 0;
-        pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-        heightLeft -= ph;
-        while (heightLeft > 0) {
-          position -= ph;
-          pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-          heightLeft -= ph;
-        }
-      }
+      const imgH = (H * pw) / W;
+      pdf.addImage(imgData, 'JPEG', 0, 0, pw, imgH);
       pdf.save(fileName);
     } catch (err) {
       console.error('PDF generation failed:', err);
