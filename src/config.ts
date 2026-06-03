@@ -7,9 +7,7 @@ export const CALC_CONFIG = {
   nonStandardPenalty: 0.05,  // 5%
   colors: ['Белый', 'Чёрный', 'Бежевый', 'Серый'],
   frameMaterials: [
-    { id: 'pine', name: 'Дерево', color: '#8b5e3c', multiplier: 1.0 },
-    { id: 'mdf', name: 'МДФ', color: '#57534e', multiplier: 1.15 },
-    { id: 'aluminum', name: 'Алюминий', color: '#94a3b8', multiplier: 1.40 }
+    { id: 'pine', name: 'Массив дерева (сосна)', color: '#8b5e3c', multiplier: 1.0 }
   ],
   productionDays: 5,
   prepaymentRate: 0.7,
@@ -24,7 +22,8 @@ export const demoGallery = [
     type: 'Ширма складная', 
     image: 'https://images.unsplash.com/photo-1598928636135-d146006ff4be?auto=format&fit=crop&q=80&w=400&h=300', 
     sections: 3,
-    meta: 'Деревянный каркас, ткань Оксфорд. Высота 1800мм.'
+    meta: 'Деревянный каркас, ткань Оксфорд. Высота 1800мм.',
+    tags: { color: 'Белый', frameColor: 'Белый' }
   },
   { 
     id: 3, 
@@ -32,7 +31,8 @@ export const demoGallery = [
     type: 'Перегородка декоративная', 
     image: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&q=80&w=400&h=300', 
     sections: 4,
-    meta: 'Деревянный каркас, ткань Blackout. Зонирование.'
+    meta: 'Деревянный каркас, ткань Blackout. Зонирование.',
+    tags: { color: 'Чёрный', frameColor: 'Чёрный' }
   },
   { 
     id: 6, 
@@ -40,6 +40,16 @@ export const demoGallery = [
     type: 'Ширма складная', 
     image: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&q=80&w=400&h=300', 
     sections: 6,
-    meta: 'Дерево, натуральный хлопок. Дизайнерская серия.'
+    meta: 'Дерево, натуральный хлопок. Дизайнерская серия.',
+    tags: { color: 'Бежевый', frameColor: 'Белый' }
+  },
+  { 
+    id: 7, 
+    title: 'Серый Оксфорд', 
+    type: 'Ширма складная', 
+    image: 'https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?auto=format&fit=crop&q=80&w=400&h=300', 
+    sections: 5,
+    meta: 'Серый цвет в интерьере офиса.',
+    tags: { color: 'Серый', frameColor: 'Чёрный' }
   },
 ];
