@@ -22,13 +22,27 @@ function SVGAnimatedNumber({ value, x, y, className, transform, textAnchor, styl
 
 export default function App() {
   const [params, setParams] = useState({
-    width: 2000, height: 1800, color: 'Белый', frameColor: 'Белый', frame: 'Массив дерева (сосна)', customer: '', customerPhone: '+7', deliveryType: 'Самовывоз', deliveryAddress: '', hasWheels: false
+    width: 2000, 
+    height: 1800, 
+    color: 'Белый', 
+    frameColor: 'Белый', 
+    frame: 'Массив дерева (сосна)', 
+    customer: '', 
+    customerPhone: '+7', 
+    deliveryType: 'Самовывоз', 
+    deliveryAddress: '', 
+    hasWheels: false,
+    hasPhotoPrint: false,
+    photoPrintPrice: 3500,
+    discount: 0,
+    manualTotal: 0,
+    manualPrepayment: 0
   });
-  
+
   const [gallery, setGallery] = useState<GalleryItem[]>(demoGallery);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
-
+  
   const [filter, setFilter] = useState('');
   const [showOnlyMatches, setShowOnlyMatches] = useState(false);
 
@@ -55,62 +69,84 @@ export default function App() {
     // 1. Calculate sections
     const sections = Math.ceil(params.width / CALC_CONFIG.sectionWidth) || 1;
     
-    // Find frame material multiplier and color
+    // Find frame material multiplier
     const frameData = CALC_CONFIG.frameMaterials.find(f => f.name === params.frame);
 
-    // 2. Base price per section based on height (Linear scaling 2800 - 3300)
+    // 2. Base price per section based on height (Linear scaling)
     const hMin = 1500;
     const hMax = 2200;
-    const pMin = CALC_CONFIG.basePrices[0].price; // 2800
-    const pMax = CALC_CONFIG.basePrices[1].price; // 3300
+    const pRetailMin = CALC_CONFIG.basePrices[0].price; // 2800
+    const pRetailMax = CALC_CONFIG.basePrices[1].price; // 3300
     
-    let pricePerSection = pMin;
+    let baseRetailPricePerSection = pRetailMin;
     if (params.height <= hMin) {
-      pricePerSection = pMin;
+      baseRetailPricePerSection = pRetailMin;
     } else if (params.height >= hMax) {
-      pricePerSection = pMax;
+      baseRetailPricePerSection = pRetailMax;
     } else {
       const ratio = (params.height - hMin) / (hMax - hMin);
-      pricePerSection = pMin + ratio * (pMax - pMin);
+      baseRetailPricePerSection = pRetailMin + ratio * (pRetailMax - pRetailMin);
     }
 
-    // 3. Total base
-    let total = pricePerSection * sections;
+    // Convert old retail base to production cost
+    const baseProductionCostPerSection = baseRetailPricePerSection / CALC_CONFIG.markup;
 
-    // Apply frame material multiplier
+    // Apply frame material multiplier to COST
+    let costPerSection = baseProductionCostPerSection;
     if (frameData) {
-      total *= frameData.multiplier;
-      pricePerSection *= frameData.multiplier;
+      costPerSection *= frameData.multiplier;
     }
 
-    // 4. Wheels (+600)
-    if (params.hasWheels) {
-      total += 600;
-    }
+    // 3. Margin logic (requested 2100-2500 per section)
+    const marginPerSection = 2300; 
+    let targetPricePerSection = costPerSection + marginPerSection;
 
-    // 5. Non-standard width penalty (+5%)
+    // 4. Base total for the construction
+    let constructionTotal = targetPricePerSection * sections;
+
+    // 5. Non-standard width penalty (+5%) - only on construction
     const isNonStandard = params.width % CALC_CONFIG.sectionWidth !== 0;
     if (isNonStandard) {
-      total *= (1 + CALC_CONFIG.nonStandardPenalty);
+      constructionTotal *= (1 + CALC_CONFIG.nonStandardPenalty);
     }
 
-    // Округление общей суммы до ближайших 100 руб в большую сторону
+    // 6. Additional costs (per order)
+    let totalExtra = 0;
+    if (params.hasWheels) totalExtra += 600;
+    if (params.hasPhotoPrint) totalExtra += params.photoPrintPrice;
+
+    // 7. Total sum
+    let total = constructionTotal + totalExtra;
+
+    // Apply discount
+    total -= params.discount;
+
+    // Manual total override
+    if (params.manualTotal > 0) {
+      total = params.manualTotal;
+    }
+
+    // Rounding
     total = Math.ceil(total / 100) * 100;
 
-    // Округление предоплаты до ближайших 100 руб в большую сторону
-    const prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 1000) * 1000;
+    // Prepayment (Default to 50% from config)
+    let prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 100) * 100;
     
-    // Округление всех менеджерских показателей в большую сторону до 100
-    const cost = Math.ceil((total / CALC_CONFIG.markup) / 100) * 100;
+    // Manual prepayment override
+    if (params.manualPrepayment > 0) {
+      prepayment = params.manualPrepayment;
+    }
+    
+    const cost = Math.ceil((costPerSection * sections) / 100) * 100;
     const margin = Math.ceil((total - cost) / 100) * 100;
     const managerEarnings = Math.ceil((margin * CALC_CONFIG.commissionRate) / 100) * 100;
 
-    // Расчет веса (примерный: 3кг на секцию + 0.5кг на колеса)
+    // Weight calculation
     const weight = (sections * 3) + (params.hasWheels ? 0.5 : 0);
 
     return { 
       sections, 
-      pricePerSection, 
+      pricePerSection: targetPricePerSection, 
       finalPricePerSection: total / sections,
       total, 
       prepayment, 
@@ -119,7 +155,7 @@ export default function App() {
       managerEarnings,
       isNonStandard,
       weight,
-      term: CALC_CONFIG.productionDays 
+      term: params.hasPhotoPrint ? 15 : CALC_CONFIG.productionDays 
     };
   }, [params]);
 
@@ -176,13 +212,17 @@ ${params.deliveryType === 'Самовывоз' ? 'Получение: Самов
 • Высота ширмы: ${params.height + (params.hasWheels ? 60 : 0)} мм ${params.hasWheels ? '(с колесами)' : ''}
 • Цвет ткани: ${params.color} (Оксфорд, можно мыть)
 • Цвет каркаса: ${params.frameColor}
+• Вариант рамы: ${params.frame}
 • Колеса: ${params.hasWheels ? 'Да (60 мм)' : 'Нет'}
-• Конструкция: ${calcResults.sections} секций (размер 1 секции: 600x${params.height + (params.hasWheels ? 60 : 0)} мм)
+${params.hasPhotoPrint ? `• Фотопечать: Да (+ ${params.photoPrintPrice} ₽)\n` : ''}• Конструкция: ${calcResults.sections} секций (размер 1 секции: 600x${params.height + (params.hasWheels ? 60 : 0)} мм)
 
 ${isProd ? `📝 ПОРЯДОК РАБОТ:
-• Каркас: ${params.frameColor}
+• Материал рамы: ${params.frame}
+• Цвет рамы: ${params.frameColor}
 • Ткань: ${params.color}
-• Сборка: ${params.hasWheels ? 'на колесах' : 'на подпятниках'}
+• Наличие колес: ${params.hasWheels ? 'УСТАНОВИТЬ' : 'без колес, на подпятниках'}
+${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна с фотопечатью\n` : ''}
+• Срок: ${calcResults.term} рабочих дней
 ` : `💰 ИТОГО К ОПЛАТЕ:
 • Общая стоимость: ${Math.round(calcResults.total).toLocaleString()} ₽
 • Предоплата: ${Math.round(calcResults.prepayment).toLocaleString()} ₽
@@ -438,7 +478,21 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                 size={14} 
                 className="text-slate-400 cursor-pointer hover:rotate-180 transition-transform duration-500" 
                 onClick={() => setParams({
-                  width: 2000, height: 1800, color: 'Белый', frameColor: 'Белый', frame: 'Массив дерева (сосна)', customer: '', customerPhone: '+7', deliveryType: 'Самовывоз', deliveryAddress: ''
+                  width: 2000, 
+                  height: 1800, 
+                  color: 'Белый', 
+                  frameColor: 'Белый', 
+                  frame: 'Массив дерева (сосна)', 
+                  customer: '', 
+                  customerPhone: '+7', 
+                  deliveryType: 'Самовывоз', 
+                  deliveryAddress: '',
+                  hasWheels: false,
+                  hasPhotoPrint: false,
+                  photoPrintPrice: 3500,
+                  discount: 0,
+                  manualTotal: 0,
+                  manualPrepayment: 0
                 })}
               />
           </div>
@@ -478,13 +532,15 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                     </div>
                     <div className="grid grid-cols-2 gap-y-1.5 text-[11px] leading-none">
                       <span className="text-slate-500">Габариты 1 створки:</span>
-                      <span className="font-bold text-indigo-900 text-right">600 x {params.height} мм</span>
-                      <span className="text-slate-500">Кол-во створок:</span>
-                      <span className="font-bold text-indigo-900 text-right">{calcResults.sections} шт</span>
+                      <span className="font-bold text-indigo-900 text-right">600 x {params.height + (params.hasWheels ? 60 : 0)} мм</span>
+                      <span className="text-slate-500">Рама:</span>
+                      <span className="font-bold text-indigo-900 text-right">{params.frame}</span>
                       <span className="text-slate-500">Цвет каркаса:</span>
                       <span className="font-bold text-indigo-900 text-right">{params.frameColor}</span>
                       <span className="text-slate-500">Цвет ткани:</span>
                       <span className="font-bold text-indigo-900 text-right">{params.color}</span>
+                      <span className="text-slate-500">Фотопечать:</span>
+                      <span className="font-bold text-indigo-900 text-right">{params.hasPhotoPrint ? 'ДА' : 'НЕТ'}</span>
                       <span className="text-slate-500 pt-1 border-t border-indigo-100/30">Колёса:</span>
                       <span className="font-bold text-indigo-900 text-right pt-1 border-t border-indigo-100/30">{params.hasWheels ? 'УСТАНОВИТЬ' : 'НЕТ'}</span>
                     </div>
@@ -587,8 +643,20 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Материал каркаса</label>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700">
-                  {params.frame}
+                <div className="flex flex-wrap gap-2">
+                  {CALC_CONFIG.frameMaterials.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setParams(prev => ({ ...prev, frame: m.name }))}
+                      className={`px-3 py-2 text-[10px] font-bold rounded-xl border transition-all ${
+                        params.frame === m.name 
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -631,6 +699,30 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
               </div>
 
               <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/50 mb-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Фотопечать</label>
+                    <p className="text-[10px] text-slate-500 font-medium italic">На все створки</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {params.hasPhotoPrint && (
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={params.photoPrintPrice} 
+                        className="w-20 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-black outline-none focus:border-indigo-500" 
+                        onChange={(e) => handleNumChange('photoPrintPrice', e.target.value)}
+                      />
+                    )}
+                    <button
+                      onClick={() => setParams(prev => ({ ...prev, hasPhotoPrint: !prev.hasPhotoPrint }))}
+                      className={`w-12 h-6 rounded-full p-1 transition-colors relative ${params.hasPhotoPrint ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm transform ${params.hasPhotoPrint ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center">
                   <div className="space-y-0.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Колеса</label>
@@ -647,6 +739,52 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                   </div>
                 </div>
               </div>
+
+              {mode === 'manager' && (
+                <div className="space-y-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                  <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    Настройки менеджера
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Скидка (₽)</label>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={params.discount === 0 ? '' : params.discount} 
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                        placeholder="0" 
+                        onChange={(e) => handleNumChange('discount', e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Итог (ручной)</label>
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={params.manualTotal === 0 ? '' : params.manualTotal} 
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                          placeholder="Авто" 
+                          onChange={(e) => handleNumChange('manualTotal', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Аванс (ручной)</label>
+                        <input 
+                          type="text" 
+                          inputMode="numeric"
+                          value={params.manualPrepayment === 0 ? '' : params.manualPrepayment} 
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                          placeholder="Авто" 
+                          onChange={(e) => handleNumChange('manualPrepayment', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
         </section>
 
@@ -785,6 +923,18 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                    {CALC_CONFIG.sectionWidth}х{params.height + (params.hasWheels ? 60 : 0)} мм
                 </span>
              </div>
+             {params.hasPhotoPrint && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Фотопечать</span>
+                  <span className="font-bold text-indigo-600">+{params.photoPrintPrice.toLocaleString()} ₽</span>
+                </div>
+              )}
+              {params.discount > 0 && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Скидка</span>
+                  <span className="font-bold text-emerald-600">-{params.discount.toLocaleString()} ₽</span>
+                </div>
+              )}
              <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">Предоплата {CALC_CONFIG.prepaymentRate * 100}%</span>
                 <span className="font-bold text-indigo-600">
@@ -979,8 +1129,10 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
             <div ref={kpRef} className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-4 custom-scrollbar" style={{ backgroundColor: '#ffffff', color: '#0f172a' }}>
               <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-100 pb-3 gap-4" style={{ borderColor: '#f1f5f9' }}>
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-0.5" style={{ color: '#0f172a', fontSize: '14px' }}>Калькулятор ширм и перегородок</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide" style={{ color: '#94a3b8' }}>Расчёт конструкций</p>
+                  <h3 className="font-bold text-slate-900 mb-0.5" style={{ color: '#0f172a', fontSize: '14px' }}>
+                    {docType === 'production' ? 'ЗАДАНИЕ В ПРОИЗВОДСТВО' : 'Коммерческое предложение'}
+                  </h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide" style={{ color: '#94a3b8' }}>{docType === 'production' ? 'Техническое описание' : 'Расчёт конструкций'}</p>
                 </div>
                 <div className="sm:text-right">
                   <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5" style={{ color: '#94a3b8' }}>Заказчик</p>
@@ -996,14 +1148,13 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Высота изделия:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.height + (params.hasWheels ? 60 : 0)} мм {params.hasWheels ? '(с колесами)' : ''}</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Кол-во створок:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{calcResults.sections} шт.</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Размер 1 створки:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{CALC_CONFIG.sectionWidth} х {params.height + (params.hasWheels ? 60 : 0)} мм</span></div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Общий вес (масса):</span> <span className="font-bold" style={{ color: '#0f172a' }}>~{calcResults.weight} кг</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Цвет ткани:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.color} (Оксфорд)</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Цвет каркаса:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.frameColor}</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Материал рамы:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.frame}</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Колеса:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.hasWheels ? 'Да (60 мм)' : 'Нет'}</span></div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Способ получения:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.deliveryType}</span></div>
-                  {params.deliveryType === 'Доставка' && (
-                    <div className="flex justify-between border-b border-slate-50 pb-1 col-span-1 sm:col-span-2" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Адрес:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.deliveryAddress}</span></div>
-                  )}
+                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Фотопечать:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.hasPhotoPrint ? 'Да' : 'Нет'}</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Общий вес:</span> <span className="font-bold" style={{ color: '#0f172a' }}>~{calcResults.weight} кг</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1 col-span-1 sm:col-span-2" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Способ получения:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.deliveryType} {params.deliveryType === 'Доставка' ? `(${params.deliveryAddress})` : ''}</span></div>
                 </div>
               </div>
 
@@ -1023,13 +1174,40 @@ ${isProd ? `📝 ПОРЯДОК РАБОТ:
                       <p className="text-slate-500 text-[10px]" style={{ color: '#64748b' }}>Цена за секцию: {Math.round(calcResults.pricePerSection).toLocaleString()} ₽</p>
                     )}
                     {docType === 'kp' && (
-                      <p className="text-slate-500 text-[10px] mt-0.5" style={{ color: '#64748b' }}>Предоплата: {CALC_CONFIG.prepaymentRate * 100}% (<span className="font-bold text-indigo-600" style={{ color: '#4f46e5' }}>{calcResults.prepayment.toLocaleString()} ₽</span>)</p>
+                      <div className="text-slate-500 text-[10px] mt-0.5 flex flex-wrap items-center gap-1" style={{ color: '#64748b' }}>
+                        <span>Предоплата: {CALC_CONFIG.prepaymentRate * 100}% (</span>
+                        {mode === 'manager' ? (
+                          <input 
+                            type="text" 
+                            inputMode="numeric"
+                            value={params.manualPrepayment === 0 ? Math.round(calcResults.prepayment) : params.manualPrepayment} 
+                            className="w-20 bg-indigo-50/50 border border-indigo-100 rounded px-1.5 py-0.5 font-bold text-indigo-600 outline-none focus:border-indigo-400 focus:bg-white transition-all" 
+                            onChange={(e) => handleNumChange('manualPrepayment', e.target.value)}
+                          />
+                        ) : (
+                          <span className="font-bold text-indigo-600" style={{ color: '#4f46e5' }}>{Math.round(calcResults.prepayment).toLocaleString()}</span>
+                        )}
+                        <span>₽)</span>
+                      </div>
                     )}
                   </div>
                   {docType === 'kp' && (
                     <div className="sm:text-right">
                       <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider" style={{ color: '#94a3b8' }}>Всего к оплате (вкл. НДС 0%)</p>
-                      <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter" style={{ color: '#0f172a' }}>{Math.round(calcResults.total).toLocaleString()} <span className="text-lg font-bold">₽</span></p>
+                      {mode === 'manager' ? (
+                         <div className="flex items-center sm:justify-end gap-1">
+                            <input 
+                              type="text" 
+                              inputMode="numeric"
+                              value={params.manualTotal === 0 ? Math.round(calcResults.total) : params.manualTotal} 
+                              className="w-32 text-left sm:text-right bg-indigo-50/50 border border-indigo-100 rounded-xl px-3 py-1.5 text-2xl font-black text-slate-900 outline-none focus:border-indigo-400 focus:bg-white transition-all" 
+                              onChange={(e) => handleNumChange('manualTotal', e.target.value)}
+                            />
+                            <span className="text-lg font-bold text-slate-900">₽</span>
+                         </div>
+                      ) : (
+                        <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter" style={{ color: '#0f172a' }}>{Math.round(calcResults.total).toLocaleString()} <span className="text-lg font-bold">₽</span></p>
+                      )}
                     </div>
                   )}
                 </div>
