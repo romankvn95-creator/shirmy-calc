@@ -10,7 +10,7 @@ export const CALC_CONFIG = {
     { id: 'pine', name: 'Массив дерева (сосна)', color: '#8b5e3c', multiplier: 1.0 }
   ],
   productionDays: 5,
-  prepaymentRate: 0.7,
+  prepaymentRate: 0.5,
   markup: 2.5,
   commissionRate: 0.2,
 };
