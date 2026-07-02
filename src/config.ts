@@ -7,7 +7,8 @@ export const CALC_CONFIG = {
   nonStandardPenalty: 0.05,  // 5%
   colors: ['Белый', 'Чёрный', 'Бежевый', 'Серый'],
   frameMaterials: [
-    { id: 'pine', name: 'Массив дерева (сосна)', color: '#8b5e3c', multiplier: 1.0 }
+    { id: 'pine', name: 'Массив дерева (сосна)', color: '#8b5e3c', multiplier: 1.0 },
+    { id: 'raw', name: 'Неокрашенное дерево', color: '#d2b48c', multiplier: 0.85 }
   ],
   productionDays: 5,
   prepaymentRate: 0.5,

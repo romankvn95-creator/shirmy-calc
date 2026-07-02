@@ -14,7 +14,7 @@ function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string
 
 function SVGAnimatedNumber({ value, x, y, className, transform, textAnchor, style, suffix = "" }: { value: number, x: number | string, y: number | string, className?: string, transform?: string, textAnchor?: string, style?: any, suffix?: string }) {
   return (
-    <text x={x} y={y} className={className} transform={transform} textAnchor={textAnchor} style={style}>
+    <text x={x} y={y} className={className} transform={transform} textAnchor={textAnchor as 'start' | 'middle' | 'end' | 'inherit'} style={style}>
       {Math.round(value).toLocaleString()}{suffix}
     </text>
   );
@@ -33,7 +33,9 @@ export default function App() {
     deliveryAddress: '', 
     hasWheels: false,
     hasPhotoPrint: false,
+    hasGoldFrame: false,
     photoPrintPrice: 3500,
+    marginPerSection: 0, // 0 means use the default 2100 logic
     discount: 0,
     manualTotal: 0,
     manualPrepayment: 0
@@ -97,9 +99,14 @@ export default function App() {
       costPerSection *= frameData.multiplier;
     }
 
-    // 3. Margin logic (requested 2100-2500 per section)
-    const marginPerSection = 2300; 
-    let targetPricePerSection = costPerSection + marginPerSection;
+    // 3. Price logic (New: 2100 base + 300 if Gold)
+    const basePricePerSection = 2100;
+    const goldFrameExtra = params.hasGoldFrame ? 300 : 0;
+    
+    // Use manual margin if set, otherwise use the base price
+    let targetPricePerSection = params.marginPerSection > 0 
+      ? (costPerSection + params.marginPerSection) 
+      : (basePricePerSection + goldFrameExtra);
 
     // 4. Base total for the construction
     let constructionTotal = targetPricePerSection * sections;
@@ -121,24 +128,18 @@ export default function App() {
     // Apply discount
     total -= params.discount;
 
-    // Manual total override
-    if (params.manualTotal > 0) {
-      total = params.manualTotal;
-    }
-
-    // Rounding
-    total = Math.ceil(total / 100) * 100;
-
-    // Prepayment (Default to 50% from config)
-    let prepayment = Math.ceil((total * CALC_CONFIG.prepaymentRate) / 100) * 100;
+    // Rounding auto total (only if no manual override)
+    const autoTotal = Math.ceil(total / 100) * 100;
     
-    // Manual prepayment override
-    if (params.manualPrepayment > 0) {
-      prepayment = params.manualPrepayment;
-    }
+    // Final total logic
+    let finalTotal = params.manualTotal > 0 ? params.manualTotal : autoTotal;
+
+    // Prepayment logic
+    const autoPrepayment = Math.ceil((finalTotal * CALC_CONFIG.prepaymentRate) / 100) * 100;
+    let prepayment = params.manualPrepayment > 0 ? params.manualPrepayment : autoPrepayment;
     
     const cost = Math.ceil((costPerSection * sections) / 100) * 100;
-    const margin = Math.ceil((total - cost) / 100) * 100;
+    const margin = Math.ceil((finalTotal - cost) / 100) * 100;
     const managerEarnings = Math.ceil((margin * CALC_CONFIG.commissionRate) / 100) * 100;
 
     // Weight calculation
@@ -147,8 +148,8 @@ export default function App() {
     return { 
       sections, 
       pricePerSection: targetPricePerSection, 
-      finalPricePerSection: total / sections,
-      total, 
+      finalPricePerSection: finalTotal / sections,
+      total: finalTotal, 
       prepayment, 
       cost,
       margin,
@@ -192,16 +193,11 @@ export default function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleCopyText = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
+  const generateText = () => {
     const isProd = docType === 'production';
     const header = isProd ? '🛠️ ЗАДАНИЕ В ПРОИЗВОДСТВО' : '📄 КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ';
     
-    const text = `${header}
+    return `${header}
 
 ${params.customer ? `Клиент: ${params.customer}` : ''}
 ${params.customerPhone ? `Тел: ${params.customerPhone}` : ''}
@@ -211,17 +207,17 @@ ${params.deliveryType === 'Самовывоз' ? 'Получение: Самов
 • Ширина проёма: ${params.width} мм
 • Высота ширмы: ${params.height + (params.hasWheels ? 60 : 0)} мм ${params.hasWheels ? '(с колесами)' : ''}
 • Цвет ткани: ${params.color} (Оксфорд, можно мыть)
-• Цвет каркаса: ${params.frameColor}
+• Цвет каркаса: ${params.frameColor} ${params.hasGoldFrame ? '(Золотой каркас)' : ''}
 • Вариант рамы: ${params.frame}
 • Колеса: ${params.hasWheels ? 'Да (60 мм)' : 'Нет'}
-${params.hasPhotoPrint ? `• Фотопечать: Да (+ ${params.photoPrintPrice} ₽)\n` : ''}• Конструкция: ${calcResults.sections} секций (размер 1 секции: 600x${params.height + (params.hasWheels ? 60 : 0)} мм)
+${params.hasGoldFrame ? `• Золотой каркас: Да (+ ${calcResults.sections * 300} ₽)\n` : ''}${params.hasPhotoPrint ? `• Фотопечать: Да (+ ${params.photoPrintPrice} ₽)\n` : ''}• Конструкция: ${calcResults.sections} секций (размер 1 секции: 600x${params.height + (params.hasWheels ? 60 : 0)} мм)
 
 ${isProd ? `📝 ПОРЯДОК РАБОТ:
 • Материал рамы: ${params.frame}
 • Цвет рамы: ${params.frameColor}
 • Ткань: ${params.color}
 • Наличие колес: ${params.hasWheels ? 'УСТАНОВИТЬ' : 'без колес, на подпятниках'}
-${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна с фотопечатью\n` : ''}
+${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в ЗОЛОТО\n` : ''}${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна с фотопечатью\n` : ''}
 • Срок: ${calcResults.term} рабочих дней
 ` : `💰 ИТОГО К ОПЛАТЕ:
 • Общая стоимость: ${Math.round(calcResults.total).toLocaleString()} ₽
@@ -232,6 +228,15 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
 • Срок изготовления: ${calcResults.term} рабочих дней
 • Гарантия: 12 месяцев
 • Ткань Оксфорд (влагостойкая, можно мыть)`;
+  };
+
+  const handleCopyText = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const text = generateText();
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -283,7 +288,29 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
           useCORS: true, 
           letterRendering: true,
           backgroundColor: '#ffffff',
-          logging: false
+          logging: false,
+          onclone: (clonedDoc: Document) => {
+            // Remove pulses and animations for PDF
+            const animations = clonedDoc.querySelectorAll('.animate-pulse');
+            animations.forEach(el => el.classList.remove('animate-pulse'));
+            
+            // Force document width for clean capture on mobile
+            const modalContent = clonedDoc.querySelector('#kp-modal-content') as HTMLElement;
+            if (modalContent) {
+              modalContent.style.width = '794px'; // ~A4 width at 96dpi
+              modalContent.style.padding = '40px';
+              modalContent.style.height = 'auto';
+              modalContent.style.overflow = 'visible';
+              
+              // Ensure all text is visible and layout is "desktop-like"
+              const gridContainers = clonedDoc.querySelectorAll('.grid');
+              gridContainers.forEach(grid => {
+                if (grid.classList.contains('sm:grid-cols-2')) {
+                   (grid as HTMLElement).style.gridTemplateColumns = 'repeat(2, 1fr)';
+                }
+              });
+            }
+          }
         },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' } as const
       };
@@ -323,8 +350,13 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
     const fillColor = colorMap[params.color] || '#ffffff';
     let frameColorVal = colorMap[params.frameColor] || '#8b5e3c';
     
-    // Ensure frame is visible if colors match
-    if (params.color === params.frameColor) {
+    // Gold frame override
+    if (params.hasGoldFrame) {
+      frameColorVal = '#d4af37'; // Golden color
+    }
+    
+    // Ensure frame is visible if colors match (and not gold)
+    else if (params.color === params.frameColor) {
       if (params.color === 'Белый') frameColorVal = '#cbd5e1'; // Silver/Gray for white
       else if (params.color === 'Чёрный') frameColorVal = '#64748b'; // Slate for black
       else if (params.color === 'Бежевый') frameColorVal = '#d2b48c'; // Tan for beige
@@ -467,8 +499,28 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
 
       <main className="flex-1 p-4 md:p-6 grid grid-cols-12 auto-rows-min gap-4 md:gap-6 overflow-y-auto custom-scrollbar">
         
+        {/* Drawing Card */}
+        <div className="order-1 lg:order-1 col-span-12 lg:col-span-5 lg:row-start-1 lg:row-end-5 bg-white border border-slate-200 rounded-3xl shadow-sm p-6 flex flex-col relative overflow-hidden group h-fit lg:h-auto min-h-[300px]">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Технический эскиз</h3>
+            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold border border-indigo-100 uppercase">SVG v1.2</span>
+          </div>
+          <div className="flex-1 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 flex items-center justify-center p-6 relative">
+             <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-20"></div>
+             <div className="relative z-0 w-full h-full max-w-md">
+               <RenderDrawing />
+             </div>
+          </div>
+
+          <div className="absolute bottom-6 right-6 flex gap-2">
+            <button className="p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95 group/btn">
+              <Download size={18} className="group-hover/btn:scale-110 transition-transform" />
+            </button>
+          </div>
+        </div>
+
         {/* Params Card */}
-        <section className="order-1 col-span-12 lg:col-span-4 lg:row-start-1 lg:row-end-7 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col h-fit">
+        <section className="order-2 col-span-12 lg:col-span-4 lg:row-start-1 lg:row-end-7 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col h-fit">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-bold text-sm md:text-base flex items-center gap-2">
               <span className="w-1.5 h-4 bg-indigo-500 rounded-full"></span> 
@@ -489,7 +541,9 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                   deliveryAddress: '',
                   hasWheels: false,
                   hasPhotoPrint: false,
+                  hasGoldFrame: false,
                   photoPrintPrice: 3500,
+                  marginPerSection: 0,
                   discount: 0,
                   manualTotal: 0,
                   manualPrepayment: 0
@@ -498,26 +552,64 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
           </div>
           <div className="p-5 space-y-5">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Имя заказчика</label>
-                    <input 
-                      type="text" 
-                      value={params.customer} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                      placeholder="Иван Иванович" 
-                      onChange={(e) => setParams(prev => ({ ...prev, customer: e.target.value }))}
-                    />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ширина проёма (мм)</label>
+                      <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        <AnimatedNumber value={params.width} />
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={params.width === 0 ? '' : params.width} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
+                        placeholder="2000" 
+                        onChange={(e) => handleNumChange('width', e.target.value)}
+                      />
+                      <div className="px-1">
+                        <input 
+                          type="range"
+                          min="600"
+                          max="6000"
+                          step="10"
+                          value={params.width}
+                          onChange={(e) => setParams(prev => ({ ...prev, width: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Телефон</label>
-                    <input 
-                      type="tel" 
-                      value={params.customerPhone} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                      placeholder="+7..." 
-                      onChange={(e) => setParams(prev => ({ ...prev, customerPhone: e.target.value }))}
-                    />
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Высота секции (мм)</label>
+                      <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        <AnimatedNumber value={params.height} />
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={params.height === 0 ? '' : params.height} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
+                        placeholder="1800" 
+                        onChange={(e) => handleNumChange('height', e.target.value)}
+                      />
+                      <div className="px-1">
+                        <input 
+                          type="range"
+                          min="1000"
+                          max="3000"
+                          step="10"
+                          value={params.height}
+                          onChange={(e) => setParams(prev => ({ ...prev, height: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -541,104 +633,13 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                       <span className="font-bold text-indigo-900 text-right">{params.color}</span>
                       <span className="text-slate-500">Фотопечать:</span>
                       <span className="font-bold text-indigo-900 text-right">{params.hasPhotoPrint ? 'ДА' : 'НЕТ'}</span>
+                      <span className="text-slate-500">Золото:</span>
+                      <span className="font-bold text-amber-600 text-right">{params.hasGoldFrame ? 'ДА' : 'НЕТ'}</span>
                       <span className="text-slate-500 pt-1 border-t border-indigo-100/30">Колёса:</span>
                       <span className="font-bold text-indigo-900 text-right pt-1 border-t border-indigo-100/30">{params.hasWheels ? 'УСТАНОВИТЬ' : 'НЕТ'}</span>
                     </div>
                   </div>
                 )}
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Получение заказа</label>
-                  <div className="flex gap-2">
-                    {['Самовывоз', 'Доставка'].map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setParams(prev => ({ ...prev, deliveryType: type as any }))}
-                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                          params.deliveryType === type 
-                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
-                            : 'bg-slate-50 border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {params.deliveryType === 'Доставка' && (
-                  <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Адрес доставки</label>
-                    <input 
-                      type="text" 
-                      value={params.deliveryAddress} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" 
-                      placeholder="Город, улица, дом..." 
-                      onChange={(e) => setParams(prev => ({ ...prev, deliveryAddress: e.target.value }))}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ширина проёма (мм)</label>
-                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                      <AnimatedNumber value={params.width} />
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <input 
-                      type="text" 
-                      inputMode="numeric"
-                      value={params.width === 0 ? '' : params.width} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                      placeholder="2000" 
-                      onChange={(e) => handleNumChange('width', e.target.value)}
-                    />
-                    <div className="px-1">
-                      <input 
-                        type="range"
-                        min="600"
-                        max="6000"
-                        step="10"
-                        value={params.width}
-                        onChange={(e) => setParams(prev => ({ ...prev, width: Number(e.target.value) }))}
-                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Высота секции (мм)</label>
-                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                      <AnimatedNumber value={params.height} />
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <input 
-                      type="text" 
-                      inputMode="numeric"
-                      value={params.height === 0 ? '' : params.height} 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm md:text-base outline-none focus:border-indigo-500 transition-colors" 
-                      placeholder="1800" 
-                      onChange={(e) => handleNumChange('height', e.target.value)}
-                    />
-                    <div className="px-1">
-                      <input 
-                        type="range"
-                        min="1000"
-                        max="3000"
-                        step="10"
-                        value={params.height}
-                        onChange={(e) => setParams(prev => ({ ...prev, height: Number(e.target.value) }))}
-                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -738,6 +739,24 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                     </button>
                   </div>
                 </div>
+
+                <div className={`flex justify-between items-center pt-2 border-t border-slate-200/50 transition-all duration-300 ${params.hasGoldFrame ? 'bg-amber-50/50 p-2 -mx-2 rounded-xl ring-1 ring-amber-300 shadow-sm' : ''}`}>
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                      [ Золотой каркас ]
+                      <Sparkles size={10} className="text-amber-500" />
+                    </label>
+                    <p className="text-[10px] text-slate-500 font-medium italic">+300 ₽ за секцию</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setParams(prev => ({ ...prev, hasGoldFrame: !prev.hasGoldFrame }))}
+                      className={`w-12 h-6 rounded-full p-1 transition-colors relative ${params.hasGoldFrame ? 'bg-amber-500' : 'bg-slate-300'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm transform ${params.hasGoldFrame ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {mode === 'manager' && (
@@ -747,6 +766,17 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                     Настройки менеджера
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Маржа за секцию (₽)</label>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={params.marginPerSection === 0 ? '' : params.marginPerSection} 
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                        placeholder={(2100 + (params.hasGoldFrame ? 300 : 0) - Math.round(calcResults.cost / calcResults.sections)).toString()} 
+                        onChange={(e) => handleNumChange('marginPerSection', e.target.value)}
+                      />
+                    </div>
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Скидка (₽)</label>
                       <input 
@@ -760,26 +790,34 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Итог (ручной)</label>
-                        <input 
-                          type="text" 
-                          inputMode="numeric"
-                          value={params.manualTotal === 0 ? '' : params.manualTotal} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
-                          placeholder="Авто" 
-                          onChange={(e) => handleNumChange('manualTotal', e.target.value)}
-                        />
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          Итог (ручной)
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            inputMode="numeric"
+                            value={params.manualTotal === 0 ? '' : params.manualTotal} 
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                            placeholder={Math.round(calcResults.total).toString()} 
+                            onChange={(e) => handleNumChange('manualTotal', e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Аванс (ручной)</label>
-                        <input 
-                          type="text" 
-                          inputMode="numeric"
-                          value={params.manualPrepayment === 0 ? '' : params.manualPrepayment} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
-                          placeholder="Авто" 
-                          onChange={(e) => handleNumChange('manualPrepayment', e.target.value)}
-                        />
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          Аванс (ручной)
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            inputMode="numeric"
+                            value={params.manualPrepayment === 0 ? '' : params.manualPrepayment} 
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-colors" 
+                            placeholder={Math.round(calcResults.prepayment).toString()} 
+                            onChange={(e) => handleNumChange('manualPrepayment', e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -788,28 +826,9 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
           </div>
         </section>
 
-        {/* Drawing Card */}
-        <div className="order-2 lg:order-2 col-span-12 lg:col-span-5 lg:row-start-1 lg:row-end-5 bg-white border border-slate-200 rounded-3xl shadow-sm p-6 flex flex-col relative overflow-hidden group h-fit lg:h-auto min-h-[300px]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Технический эскиз</h3>
-            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold border border-indigo-100 uppercase">SVG v1.2</span>
-          </div>
-          <div className="flex-1 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 flex items-center justify-center p-6 relative">
-             <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-20"></div>
-             <div className="relative z-0 w-full h-full max-w-md">
-               <RenderDrawing />
-             </div>
-          </div>
-
-          <div className="absolute bottom-6 right-6 flex gap-2">
-            <button className="p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95 group/btn">
-              <Download size={18} className="group-hover/btn:scale-110 transition-transform" />
-            </button>
-          </div>
-        </div>
 
         {/* Distinct Sections/Term Block */}
-        <div className="order-4 lg:order-4 col-span-12 lg:col-span-5 lg:row-start-5 lg:row-end-6 grid grid-cols-2 gap-2 sm:gap-4 bg-indigo-50 border border-indigo-100 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 shadow-sm">
+        <div className="order-4 col-span-12 lg:col-span-5 lg:row-start-5 lg:row-end-6 grid grid-cols-2 gap-2 sm:gap-4 bg-indigo-50 border border-indigo-100 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 shadow-sm">
           <div className="space-y-0.5 sm:space-y-1">
             <span className="text-[9px] sm:text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Секции</span>
             <p className="text-lg sm:text-2xl font-black text-indigo-900 leading-tight">{calcResults.sections} шт <span className="text-[10px] sm:text-xs font-medium text-indigo-400 block sm:inline sm:ml-1">({(calcResults.sections * 60)} см)</span></p>
@@ -896,7 +915,7 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
         </div>
 
         {/* Breakdown Card */}
-        <div className="order-4 lg:order-5 col-span-12 lg:col-span-3 lg:row-start-5 lg:row-end-7 bg-white border border-slate-200 rounded-3xl shadow-sm p-5 h-fit">
+        <div className="order-5 col-span-12 lg:col-span-3 lg:row-start-5 lg:row-end-8 bg-white border border-slate-200 rounded-3xl shadow-sm p-5 h-fit">
            <h3 className="font-bold text-slate-400 uppercase mb-4 text-[10px] tracking-wider">Детализация заказа</h3>
            <div className="space-y-2.5">
              <div className="flex justify-between items-center text-xs">
@@ -951,7 +970,76 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
            </div>
         </div>
 
-        {/* Портфолио временно скрыто по просьбе пользователя */}
+        {/* Customer Info Card */}
+        <div className="order-6 col-span-12 lg:col-span-5 lg:row-start-6 lg:row-end-8 bg-white border border-slate-200 rounded-3xl shadow-sm p-6 space-y-4">
+           <div className="flex items-center gap-2 mb-2">
+             <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center">
+               <User size={18} className="text-indigo-600" />
+             </div>
+             <div>
+               <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">Заказчик и доставка</h3>
+               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-0.5">Информация для связи</p>
+             </div>
+           </div>
+           
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Имя заказчика</label>
+                <input 
+                  type="text" 
+                  value={params.customer} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" 
+                  placeholder="Иван Иванович" 
+                  onChange={(e) => setParams(prev => ({ ...prev, customer: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Телефон</label>
+                <input 
+                  type="tel" 
+                  value={params.customerPhone} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" 
+                  placeholder="+7..." 
+                  onChange={(e) => setParams(prev => ({ ...prev, customerPhone: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Получение заказа</label>
+              <div className="flex gap-2">
+                {['Самовывоз', 'Доставка'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setParams(prev => ({ ...prev, deliveryType: type as any }))}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
+                      params.deliveryType === type 
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {params.deliveryType === 'Доставка' && (
+              <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Адрес доставки</label>
+                <div className="relative">
+                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    value={params.deliveryAddress} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" 
+                    placeholder="Город, улица, дом..." 
+                    onChange={(e) => setParams(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+        </div>
         {/* Gallery Card 
         <div className="order-5 lg:order-4 col-span-12 lg:col-span-5 lg:row-start-5 lg:row-end-8 bg-white border border-slate-200 rounded-3xl shadow-sm p-5 overflow-hidden flex flex-col h-fit lg:h-[420px]">
            ... (hidden code) ...
@@ -1105,24 +1193,35 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
           <div className="bg-white w-full max-w-2xl h-full max-h-[95vh] sm:max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
             {/* KP Header */}
             <div 
-              style={{ backgroundColor: docType === 'production' ? '#1e1b4b' : '#0f172a' }}
-              className="p-5 sm:p-8 text-white flex justify-between items-center transition-colors duration-500"
+              style={{ backgroundColor: docType === 'production' ? '#312e81' : '#0f172a' }}
+              className="p-5 sm:p-6 text-white transition-colors duration-500"
             >
-              <div>
-                <h2 className="text-lg sm:text-2xl font-black uppercase tracking-tighter">
-                  {docType === 'production' ? 'Задание в производство' : 'Коммерческое предложение'}
-                </h2>
-                <p className="text-[10px] sm:text-xs text-slate-400 opacity-80 mt-1 uppercase tracking-widest font-black">
-                  {docType === 'production' ? 'Техническая документация' : `№ ${Math.floor(Math.random() * 100000)} от ${new Date().toLocaleDateString()}`}
-                </p>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-lg sm:text-2xl font-black uppercase tracking-tighter">
+                    {docType === 'production' ? 'Задание в производство' : 'Коммерческое предложение'}
+                  </h2>
+                  <p className="text-[10px] sm:text-xs text-slate-400 opacity-80 mt-1 uppercase tracking-widest font-black">
+                    {docType === 'production' ? 'Техническая документация' : `№ ${Math.floor(Math.random() * 100000)} от ${new Date().toLocaleDateString()}`}
+                  </p>
+                </div>
               </div>
-              <button 
-                onClick={() => setShowKP(false)} 
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-                className="w-8 h-8 sm:w-10 sm:h-10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
-              >
-                <RefreshCw size={16} className="rotate-45" />
-              </button>
+
+              {/* View Switcher Toggle */}
+              <div className="flex p-1 bg-black/20 rounded-xl max-w-sm">
+                <button 
+                  onClick={() => setDocType('kp')}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${docType === 'kp' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-300 hover:text-white'}`}
+                >
+                  Для клиента (КП)
+                </button>
+                <button 
+                  onClick={() => setDocType('production')}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${docType === 'production' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-300 hover:text-white'}`}
+                >
+                  Производство
+                </button>
+              </div>
             </div>
 
             {/* KP Content */}
@@ -1158,6 +1257,48 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                 </div>
               </div>
 
+              {docType === 'production' && (
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 space-y-3" style={{ backgroundColor: '#f5f3ff', borderColor: '#e0e7ff' }}>
+                  <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
+                    Важные отметки цеху
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider" style={{ color: '#94a3b8' }}>Тип рамы</p>
+                      <p 
+                        className={`text-xs font-black p-2 rounded-lg border ${params.frame === 'Неокрашенное дерево' ? 'animate-pulse' : ''}`}
+                        style={{ 
+                          backgroundColor: params.frame === 'Неокрашенное дерево' ? '#fef3c7' : '#ffffff',
+                          borderColor: params.frame === 'Неокрашенное дерево' ? '#fcd34d' : '#e2e8f0',
+                          color: params.frame === 'Неокрашенное дерево' ? '#78350f' : '#0f172a'
+                        }}
+                      >
+                        {params.frame}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider" style={{ color: '#94a3b8' }}>Покраска</p>
+                      <p className="text-xs font-black p-2 bg-white border border-slate-200 rounded-lg text-slate-900" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a' }}>
+                        {params.frame === 'Неокрашенное дерево' ? 'БЕЗ ОКРАШИВАНИЯ (ШЛИФОВКА)' : `Цвет: ${params.frameColor}`}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider" style={{ color: '#94a3b8' }}>Ткань / Наполнение</p>
+                      <p className="text-xs font-black p-2 bg-white border border-slate-200 rounded-lg text-slate-900" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a' }}>
+                        {params.color} (Оксфорд) {params.hasPhotoPrint ? '+ ФОТОПЕЧАТЬ' : ''}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider" style={{ color: '#94a3b8' }}>Фурнитура</p>
+                      <p className="text-xs font-black p-2 bg-white border border-slate-200 rounded-lg text-slate-900" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a' }}>
+                        {params.hasWheels ? 'УСТАНОВИТЬ КОЛЁСА (60мм)' : 'ПОДПЯТНИКИ ПЛАСТИК'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100" style={{ backgroundColor: '#f8fafc', borderColor: '#f1f5f9' }}>
                 <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2" style={{ color: '#94a3b8' }}>Схематичное изображение</h4>
                 <div className="w-full h-[160px] bg-white rounded-lg border border-slate-200 p-2 shadow-inner" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0' }}>
@@ -1171,23 +1312,25 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1" style={{ color: '#94a3b8' }}>Условия поставки</p>
                     <p className="font-bold text-slate-900 text-xs" style={{ color: '#0f172a' }}>Срок изготовления: {calcResults.term} рабочих дней</p>
                     {mode === 'manager' && docType === 'kp' && (
-                      <p className="text-slate-500 text-[10px]" style={{ color: '#64748b' }}>Цена за секцию: {Math.round(calcResults.pricePerSection).toLocaleString()} ₽</p>
+                      <p className="text-slate-500 text-[10px]" style={{ color: '#64748b' }}>Цена за секцию: {Math.round(calcResults.finalPricePerSection).toLocaleString()} ₽</p>
                     )}
                     {docType === 'kp' && (
                       <div className="text-slate-500 text-[10px] mt-0.5 flex flex-wrap items-center gap-1" style={{ color: '#64748b' }}>
-                        <span>Предоплата: {CALC_CONFIG.prepaymentRate * 100}% (</span>
+                        <span style={{ color: '#64748b' }}>Предоплата: </span>
                         {mode === 'manager' ? (
                           <input 
                             type="text" 
                             inputMode="numeric"
-                            value={params.manualPrepayment === 0 ? Math.round(calcResults.prepayment) : params.manualPrepayment} 
-                            className="w-20 bg-indigo-50/50 border border-indigo-100 rounded px-1.5 py-0.5 font-bold text-indigo-600 outline-none focus:border-indigo-400 focus:bg-white transition-all" 
+                            value={params.manualPrepayment === 0 ? '' : params.manualPrepayment} 
+                            placeholder={Math.round(calcResults.prepayment).toLocaleString()}
+                            className="w-20 bg-indigo-50/50 border border-indigo-100 rounded px-1.5 py-0.5 font-bold text-indigo-600 outline-none focus:border-indigo-400 focus:bg-white transition-all text-center" 
+                            style={{ backgroundColor: 'rgba(245, 243, 255, 0.5)', borderColor: '#e0e7ff', color: '#4f46e5' }}
                             onChange={(e) => handleNumChange('manualPrepayment', e.target.value)}
                           />
                         ) : (
                           <span className="font-bold text-indigo-600" style={{ color: '#4f46e5' }}>{Math.round(calcResults.prepayment).toLocaleString()}</span>
                         )}
-                        <span>₽)</span>
+                        <span style={{ color: '#64748b' }}>₽ ({Math.round((calcResults.prepayment / calcResults.total) * 100)}%)</span>
                       </div>
                     )}
                   </div>
@@ -1199,14 +1342,16 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
                             <input 
                               type="text" 
                               inputMode="numeric"
-                              value={params.manualTotal === 0 ? Math.round(calcResults.total) : params.manualTotal} 
+                              value={params.manualTotal === 0 ? '' : params.manualTotal} 
+                              placeholder={Math.round(calcResults.total).toLocaleString()}
                               className="w-32 text-left sm:text-right bg-indigo-50/50 border border-indigo-100 rounded-xl px-3 py-1.5 text-2xl font-black text-slate-900 outline-none focus:border-indigo-400 focus:bg-white transition-all" 
+                              style={{ backgroundColor: 'rgba(245, 243, 255, 0.5)', borderColor: '#e0e7ff', color: '#0f172a' }}
                               onChange={(e) => handleNumChange('manualTotal', e.target.value)}
                             />
-                            <span className="text-lg font-bold text-slate-900">₽</span>
+                            <span className="text-lg font-bold text-slate-900" style={{ color: '#0f172a' }}>₽</span>
                          </div>
                       ) : (
-                        <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter" style={{ color: '#0f172a' }}>{Math.round(calcResults.total).toLocaleString()} <span className="text-lg font-bold">₽</span></p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter" style={{ color: '#0f172a' }}>{Math.round(calcResults.total).toLocaleString()} <span className="text-lg font-bold" style={{ color: '#0f172a' }}>₽</span></p>
                       )}
                     </div>
                   )}
@@ -1223,29 +1368,24 @@ ${params.hasPhotoPrint ? `• ПЕЧАТЬ: Установить полотна 
             <div className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 relative z-[70]">
               <button 
                 onClick={(e) => handleSavePDF(e)}
-                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg active:scale-95"
+                className="flex-[2] py-3 sm:py-4 bg-indigo-600 text-white font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-lg active:scale-95 text-xs sm:text-sm"
               >
-                <Download size={18} /> Сохранить PDF
+                <Download size={18} /> PDF
               </button>
+              
               <button 
                 onClick={(e) => handleCopyText(e)}
-                className={`flex-[2] py-3 sm:py-4 font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${isCopied ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                className={`flex-[2] py-3 sm:py-4 font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 border-2 text-xs sm:text-sm ${isCopied ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
-                {isCopied ? (
-                  <>
-                    <Check size={18} /> Скопировано
-                  </>
-                ) : (
-                  <>
-                    <Copy size={18} /> {docType === 'production' ? 'Скопировать задание' : 'Сформировать текст'}
-                  </>
-                )}
+                {isCopied ? <Check size={18} /> : <Copy size={18} />} 
+                {isCopied ? 'Скопировано' : (docType === 'production' ? 'Копировать' : 'Текст')}
               </button>
+
               <button 
                 onClick={() => setShowKP(false)}
-                className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors"
+                className="flex-1 py-3 sm:py-4 bg-white text-slate-900 font-bold rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors text-xs sm:text-sm"
               >
-                Вернуться
+                Назад
               </button>
             </div>
           </div>
