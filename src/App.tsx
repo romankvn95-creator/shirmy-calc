@@ -1248,7 +1248,7 @@ ${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в З
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Кол-во створок:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{calcResults.sections} шт.</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Размер 1 створки:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{CALC_CONFIG.sectionWidth} х {params.height + (params.hasWheels ? 60 : 0)} мм</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Цвет ткани:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.color} (Оксфорд)</span></div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Цвет каркаса:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.frameColor}</span></div>
+                  <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Цвет каркаса:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.hasGoldFrame ? 'ЗОЛОТОЙ КАРКАС' : params.frameColor}</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Материал рамы:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.frame}</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Колеса:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.hasWheels ? 'Да (60 мм)' : 'Нет'}</span></div>
                   <div className="flex justify-between border-b border-slate-50 pb-1" style={{ borderColor: '#f8fafc' }}><span className="text-slate-400" style={{ color: '#94a3b8' }}>Фотопечать:</span> <span className="font-bold" style={{ color: '#0f172a' }}>{params.hasPhotoPrint ? 'Да' : 'Нет'}</span></div>
@@ -1280,7 +1280,7 @@ ${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в З
                     <div className="space-y-1">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider" style={{ color: '#94a3b8' }}>Покраска</p>
                       <p className="text-xs font-black p-2 bg-white border border-slate-200 rounded-lg text-slate-900" style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a' }}>
-                        {params.frame === 'Неокрашенное дерево' ? 'БЕЗ ОКРАШИВАНИЯ (ШЛИФОВКА)' : `Цвет: ${params.frameColor}`}
+                        {params.frame === 'Неокрашенное дерево' ? 'БЕЗ ОКРАШИВАНИЯ (ШЛИФОВКА)' : (params.hasGoldFrame ? 'ЗОЛОТОЙ КАРКАС' : `Цвет: ${params.frameColor}`)}
                       </p>
                     </div>
                     <div className="space-y-1">
