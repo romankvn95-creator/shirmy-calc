@@ -861,12 +861,16 @@ ${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в З
               </div>
             </div>
 
-            <button 
-              onClick={saveToHistory}
-              className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
-            >
-              <HistoryIcon size={14} /> {isCopied ? 'Сохранено!' : 'Сохранить расчёт'}
-            </button>
+            {/* Save to History Button - Manager Only */}
+            {mode === 'manager' && (
+              <button 
+                onClick={saveToHistory}
+                className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+              >
+                {isCopied ? <Check size={14} className="text-emerald-400" /> : <HistoryIcon size={14} />}
+                <span>{isCopied ? 'Сохранено!' : 'Сохранить расчёт'}</span>
+              </button>
+            )}
             
             {mode === 'manager' && (
               <div className="mt-6 p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl space-y-3 animate-in fade-in duration-500">
@@ -1058,17 +1062,18 @@ ${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в З
                 onClick={() => { if(confirm('Очистить всю историю?')) setHistory([]); }}
                 className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest flex items-center gap-1.5 p-2"
               >
-                <Trash2 size={12} /> Очистить
+                <Trash2 size={12} /> Очистить всё
               </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {history.map((entry) => (
-                <div key={entry.id} className="bg-white border border-slate-200 rounded-[32px] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div key={entry.id} className="bg-white border border-slate-200 rounded-[32px] p-6 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+                  <div className="absolute top-4 right-4 z-10">
                     <button 
                       onClick={() => setHistory(prev => prev.filter(h => h.id !== entry.id))}
-                      className="p-2.5 bg-white text-slate-300 hover:text-red-500 rounded-2xl border border-slate-100 transition-colors shadow-sm"
+                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      title="Удалить из истории"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -1090,18 +1095,27 @@ ${params.hasGoldFrame ? `• ЗОЛОТО: Покраска каркаса в З
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Конструкция</p>
                       <p className="text-sm font-black text-slate-900">{entry.results.sections} шт. ({CALC_CONFIG.sectionWidth}х{entry.params.height + (entry.params.hasWheels ? 60 : 0)})</p>
                     </div>
-                    <div className="space-y-1 pl-2">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Ваш доход</p>
-                      <p className="text-sm font-black text-emerald-600">+{entry.results.managerEarnings.toLocaleString()} ₽</p>
-                    </div>
+                    {mode === 'manager' ? (
+                      <div className="space-y-1 pl-2">
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Ваш доход</p>
+                        <p className="text-sm font-black text-emerald-600">+{entry.results.managerEarnings.toLocaleString()} ₽</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 pl-2">
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Итого</p>
+                        <p className="text-sm font-black text-indigo-600">{entry.results.total.toLocaleString()} ₽</p>
+                      </div>
+                    )}
                     <div className="space-y-1 border-r border-slate-200">
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Габариты</p>
                       <p className="text-[10px] font-bold text-slate-600">{entry.params.width}x{entry.params.height}</p>
                     </div>
-                    <div className="space-y-1 pl-2">
-                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Итого</p>
-                       <p className="text-[10px] font-black text-slate-900">{entry.results.total.toLocaleString()} ₽</p>
-                    </div>
+                    {mode === 'manager' && (
+                      <div className="space-y-1 pl-2">
+                         <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Итого</p>
+                         <p className="text-[10px] font-black text-slate-900">{entry.results.total.toLocaleString()} ₽</p>
+                      </div>
+                    )}
                   </div>
 
                   <button 
